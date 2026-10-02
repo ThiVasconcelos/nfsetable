@@ -455,6 +455,8 @@ export class AppStore {
 
   // Internals (not reactive)
   #cache = new Map<string, DocResult>()
+  /** Bumped by forgetCache(): a run that started before it neither caches nor shows its results. */
+  #generation = 0
   #dirty = false
   #running = false
   #chunkBase = 0
@@ -807,6 +809,7 @@ export class AppStore {
   /** Forgets cached results (e.g. the profiles changed): the next scan reads every file again. */
   forgetCache() {
     this.#cache.clear()
+    this.#generation++
   }
 
   /** Forgets cached results (e.g. after profiles changed) and reads everything again. */
@@ -833,6 +836,7 @@ export class AppStore {
   }
 
   async #runOnce() {
+    const generation = this.#generation
     const sources = $state.snapshot(this.sources)
     if (!sources.length) {
       this.scan = null
@@ -842,7 +846,7 @@ export class AppStore {
     }
     this.phase = 'scanning'
     const scan = await api.scanSources({ sources, exclude: $state.snapshot(this.exclude) })
-    if (this.#dirty) return
+    if (this.#dirty || generation !== this.#generation) return
 
     const previousHash = new Map((this.scan?.files ?? []).map((f) => [f.path, f.hash]))
     const results: Record<string, DocResult> = {}
@@ -881,6 +885,9 @@ export class AppStore {
         docs = chunk.map((path) => ({ path, status: 'error', message, docType: 'PDF', kind: 'revenue', fields: {}, pageCount: 0 }))
         this.toast(`Falha ao ler ${plural(chunk.length, 'arquivo', 'arquivos')}: ${message}`, 'error')
       }
+      // The profiles changed while this chunk was read: its results are stale, and the run that
+      // forgetCache() scheduled (if any) reads these files again.
+      if (generation !== this.#generation) return
       const next = { ...this.results }
       docs.forEach((doc, k) => {
         // Trust the order of the answer; fall back to the returned path.
