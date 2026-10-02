@@ -139,7 +139,7 @@ export interface ScannedFile {
   name: string
   dir: string
   size: number
-  /** SHA-256 of the content, lowercase hex. */
+  /** SHA-256 of the content, lowercase hex; empty when the file could not be read (locked by another program, no permission). */
   hash: string
   /** Path of the first file (in scan order) with the same hash, if this one is a duplicate. */
   duplicateOf: string | null

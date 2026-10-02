@@ -1237,11 +1237,14 @@ export interface MockControls {
   taxInputs: TaxInput[]
   /** Calls seen by the backend: scans, and the store documents read (in order). */
   log: { scans: number; reads: string[]; extracted: number }
+  /** Paths the scan cannot read (empty hash, like a file locked by another program). */
+  unreadable: Set<string>
 }
 
 const exportLog: ExportRequest[] = []
 const taxLog: TaxInput[] = []
 const callLog = { scans: 0, reads: [] as string[], extracted: 0 }
+const unreadable = new Set<string>()
 
 const STORE_NAME = /^[a-z0-9-]{1,40}$/
 const STORE_MAX_BYTES = 2 * 1024 * 1024
@@ -1288,6 +1291,7 @@ function installControls() {
     exports: exportLog,
     taxInputs: taxLog,
     log: callLog,
+    unreadable,
   }
   window.__mock = controls
 }
@@ -1400,14 +1404,14 @@ export function createMockBackend(): Backend {
       const firstByContent = new Map<string, string>()
       const files: ScannedFile[] = docs.map((doc) => {
         const first = firstByContent.get(doc.contentId)
-        if (!first) firstByContent.set(doc.contentId, doc.path)
+        if (!first && !unreadable.has(doc.path)) firstByContent.set(doc.contentId, doc.path)
         return {
           path: doc.path,
           name: doc.name,
           dir: doc.dir,
           size: 38_000 + (fnv1a(doc.contentId, 7) % 90_000),
-          hash: fakeHash(doc.contentId),
-          duplicateOf: first ?? null,
+          hash: unreadable.has(doc.path) ? '' : fakeHash(doc.contentId),
+          duplicateOf: unreadable.has(doc.path) ? null : (first ?? null),
         }
       })
       return { sources: infos, files, excluded: [...excluded].sort() }

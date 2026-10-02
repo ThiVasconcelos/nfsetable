@@ -185,7 +185,8 @@ pub struct ScannedFile {
     pub dir: String,
     /// Size in bytes.
     pub size: u64,
-    /// SHA-256 of the content, lowercase hex.
+    /// SHA-256 of the content, lowercase hex; empty when the file could not be read (locked by
+    /// another program, no permission).
     pub hash: String,
     /// Path of the first file (in scan order) with the same hash, if this one is a duplicate.
     pub duplicate_of: Option<String>,

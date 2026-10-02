@@ -136,7 +136,8 @@ export interface Row {
   path: string
   name: string
   dir: string
-  hash: string
+  /** Identity of the file for the user's edits (see fileKey). */
+  key: string
   /** Normalized name for search. */
   searchKey: string
   duplicateOf: string | null
@@ -252,6 +253,15 @@ function isKind(value: unknown): value is DocKind {
 }
 
 /**
+ * Identity of a file for the cache and the user's edits: its SHA-256, or its path when the scan
+ * could not read it (locked by another program, no permission), since every such file has the
+ * same empty hash.
+ */
+function fileKey(f: ScannedFile): string {
+  return f.hash || `path:${pathKey(f.path)}`
+}
+
+/**
  * Key of a file's extraction result: its content and its name, since profiles may match by name
  * (the same content under another name can read differently). Empty when the scan could not read
  * the file.
@@ -265,7 +275,8 @@ function parseOverrides(raw: unknown): Record<string, Override> {
   const out: Record<string, Override> = {}
   if (!isRecord(raw)) return out
   for (const [hash, value] of Object.entries(raw)) {
-    if (!isRecord(value)) continue
+    // "" was the shared key of unreadable files in the first versions: it belongs to no file.
+    if (!hash || !isRecord(value)) continue
     const o: Override = {}
     if (typeof value.cents === 'number' && Number.isSafeInteger(value.cents)) {
       o.cents = value.cents
@@ -618,7 +629,7 @@ export class AppStore {
   removedCount = $derived.by(
     () =>
       (this.scan?.files ?? []).filter(
-        (f) => this.overrides[f.hash]?.removed || (f.duplicateOf && this.hiddenCopies.has(f.path)),
+        (f) => this.overrides[fileKey(f)]?.removed || (f.duplicateOf && this.hiddenCopies.has(f.path)),
       ).length,
   )
 
@@ -946,7 +957,8 @@ export class AppStore {
     const nameByPath = new Map(scan.files.map((f) => [f.path, f.name]))
     const rows: Row[] = []
     for (const f of scan.files) {
-      const o = this.overrides[f.hash]
+      const key = fileKey(f)
+      const o = this.overrides[key]
       if (o?.removed || (f.duplicateOf && this.hiddenCopies.has(f.path))) continue
       const result = this.results[f.path] ?? null
       const extracted = result?.fields[NET_VALUE_FIELD] ?? null
@@ -987,7 +999,7 @@ export class AppStore {
         path: f.path,
         name: f.name,
         dir: f.dir,
-        hash: f.hash,
+        key,
         searchKey: normalizeText(f.name),
         duplicateOf: f.duplicateOf,
         duplicateName: f.duplicateOf ? (nameByPath.get(f.duplicateOf) ?? baseName(f.duplicateOf)) : null,
@@ -1052,16 +1064,16 @@ export class AppStore {
   setValue(row: Row, cents: number | null) {
     const extracted = row.result?.fields[NET_VALUE_FIELD]?.cents ?? null
     if (cents == null || (cents === extracted && extracted != null)) {
-      this.#patchOverride(row.hash, {}, ['cents', 'origin', 'raw', 'page', 'bbox'])
+      this.#patchOverride(row.key, {}, ['cents', 'origin', 'raw', 'page', 'bbox'])
     } else if (cents !== row.cents || !row.valueEdited) {
-      this.#patchOverride(row.hash, { cents, origin: 'manual' }, ['raw', 'page', 'bbox'])
+      this.#patchOverride(row.key, { cents, origin: 'manual' }, ['raw', 'page', 'bbox'])
     }
   }
 
   setType(row: Row, type: string) {
     const t = type.trim()
-    if (!t || t === row.defaultType) this.#patchOverride(row.hash, {}, ['docType'])
-    else this.#patchOverride(row.hash, { docType: t })
+    if (!t || t === row.defaultType) this.#patchOverride(row.key, {}, ['docType'])
+    else this.#patchOverride(row.key, { docType: t })
   }
 
   /** Sets the same type on several rows, with one undo for the whole batch. */
@@ -1070,9 +1082,9 @@ export class AppStore {
     if (!t || !rows.length) return
     const previous = new Map<string, string | undefined>()
     for (const row of rows) {
-      if (!previous.has(row.hash)) previous.set(row.hash, this.overrides[row.hash]?.docType)
-      if (t === row.defaultType) this.#patchOverride(row.hash, {}, ['docType'], false)
-      else this.#patchOverride(row.hash, { docType: t }, [], false)
+      if (!previous.has(row.key)) previous.set(row.key, this.overrides[row.key]?.docType)
+      if (t === row.defaultType) this.#patchOverride(row.key, {}, ['docType'], false)
+      else this.#patchOverride(row.key, { docType: t }, [], false)
     }
     this.#saveOverrides()
     this.toast(`Tipo “${t}” definido em ${plural(rows.length, 'nota', 'notas')}.`, 'success', {
@@ -1099,9 +1111,9 @@ export class AppStore {
     }
     const previous = new Map<string, DocKind | undefined>()
     for (const row of list) {
-      if (!previous.has(row.hash)) previous.set(row.hash, this.overrides[row.hash]?.kind)
-      if (kind === row.defaultKind) this.#patchOverride(row.hash, {}, ['kind'], false)
-      else this.#patchOverride(row.hash, { kind }, [], false)
+      if (!previous.has(row.key)) previous.set(row.key, this.overrides[row.key]?.kind)
+      if (kind === row.defaultKind) this.#patchOverride(row.key, {}, ['kind'], false)
+      else this.#patchOverride(row.key, { kind }, [], false)
     }
     this.#saveOverrides()
     const what = kind === 'expense' ? 'despesa' : 'receita'
@@ -1128,8 +1140,8 @@ export class AppStore {
 
   /** Sets the competence month (`yyyy-mm`); `null` reverts to the one read from the document. */
   setCompetence(row: Row, month: string | null) {
-    if (month == null || month === row.extractedCompetence) this.#patchOverride(row.hash, {}, ['competence'])
-    else if (month !== row.competence || !row.competenceEdited) this.#patchOverride(row.hash, { competence: month })
+    if (month == null || month === row.extractedCompetence) this.#patchOverride(row.key, {}, ['competence'])
+    else if (month !== row.competence || !row.competenceEdited) this.#patchOverride(row.key, { competence: month })
   }
 
   /**
@@ -1151,9 +1163,9 @@ export class AppStore {
           this.hiddenCopies.add(row.path)
           copies.push(row.path)
         }
-      } else if (!this.overrides[row.hash]?.removed) {
-        this.#patchOverride(row.hash, { removed: true }, [], false)
-        hashes.push(row.hash)
+      } else if (!this.overrides[row.key]?.removed) {
+        this.#patchOverride(row.key, { removed: true }, [], false)
+        hashes.push(row.key)
       }
       this.selected.delete(row.path)
       if (this.activePath === row.path) this.closePreview()
@@ -1177,7 +1189,8 @@ export class AppStore {
 
   restoreRemoved() {
     for (const f of this.scan?.files ?? []) {
-      if (this.overrides[f.hash]?.removed) this.#patchOverride(f.hash, {}, ['removed'], false)
+      const key = fileKey(f)
+      if (this.overrides[key]?.removed) this.#patchOverride(key, {}, ['removed'], false)
       this.hiddenCopies.delete(f.path)
     }
     this.#saveOverrides()
@@ -1335,7 +1348,7 @@ export class AppStore {
     const value = this.region?.read?.value
     const row = this.rows.find((r) => r.path === this.region?.path)
     if (!value || value.cents == null || !row) return
-    this.#patchOverride(row.hash, { cents: value.cents, origin: 'region', raw: value.raw, page: value.page, bbox: value.bbox })
+    this.#patchOverride(row.key, { cents: value.cents, origin: 'region', raw: value.raw, page: value.page, bbox: value.bbox })
     this.toast('Valor aplicado nesta nota.', 'success')
   }
 
@@ -1390,7 +1403,7 @@ export class AppStore {
       const row = rowByPath.get(t.path)
       if (!row) continue
       const v = t.value
-      this.#patchOverride(row.hash, { cents: v.cents!, origin: 'region', raw: v.raw, page: v.page, bbox: v.bbox }, [], false)
+      this.#patchOverride(row.key, { cents: v.cents!, origin: 'region', raw: v.raw, page: v.page, bbox: v.bbox }, [], false)
       applied++
     }
     this.#saveOverrides()
