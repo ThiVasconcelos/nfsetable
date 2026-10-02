@@ -673,6 +673,8 @@ export class AppStore {
 
   /** Another company: nothing of the previous one stays on screen (UI preferences are kept). */
   resetView() {
+    // "Desfazer" acts on whatever company is open when it is clicked, so it dies with this one.
+    this.toasts = this.toasts.filter((t) => !t.action)
     this.clearSelection()
     this.closePreview()
     this.ruleTest = null
