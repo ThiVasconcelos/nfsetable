@@ -1,0 +1,8 @@
+{
+  "bundle": {
+    "resources": {
+      "../../vendor/pdfium/macos-arm64/libpdfium.dylib": "pdfium/libpdfium.dylib",
+      "../../vendor/pdfium/macos-arm64/LICENSE-pdfium.txt": "pdfium/LICENSE-pdfium.txt"
+    }
+  }
+}

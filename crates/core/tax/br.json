@@ -1,0 +1,363 @@
+{
+  "schema_version": 1,
+  "jurisdiction": "BR",
+  "updated_at": "2026-09-29",
+  "disclaimer": "Tabelas tributárias usadas pelas estimativas do nfsetable (pró-labore, MEI, Simples Nacional e Lucro Presumido). Conferidas na fonte primária em 29/09/2026, exceto os blocos com \"unverified\": true. Não substituem um contador. Valores monetários em reais, taxas em decimal (0.06 = 6%), datas em AAAA-MM-DD. Cada bloco vale de valid_from a valid_to (null = ainda em vigor na data da conferência); o cálculo escolhe o bloco pelo mês de referência, nunca pela data de hoje. Em regras antigas cuja data de início não foi conferida, valid_from indica o início do período coberto por este arquivo (2025-01-01).",
+  "coverage": {
+    "valid_from": "2025-01-01",
+    "valid_to": "2026-12-31",
+    "before_note": "As tabelas anteriores a 2025 (salário mínimo, INSS, IRRF, DAS-MEI) não estão incluídas.",
+    "after_note": "As regras de 2027 em diante ainda não estão incluídas: nova janela do RBT12 e do Fator R, IBS e CBS no lugar de PIS e Cofins, novas tabelas do Simples Nacional e novos valores de salário mínimo, INSS e IRRF."
+  },
+  "minimum_wage": [
+    {
+      "source": "Decreto 12.342/2024",
+      "valid_from": "2025-01-01",
+      "valid_to": "2025-12-31",
+      "monthly": 1518.00
+    },
+    {
+      "source": "Decreto 12.797/2025",
+      "valid_from": "2026-01-01",
+      "valid_to": "2026-12-31",
+      "monthly": 1621.00
+    }
+  ],
+  "inss": [
+    {
+      "source": "Portaria Interministerial MPS/MF 6/2025; Lei 8.212/1991, arts. 21 e 30, § 4º; IN RFB 2.110/2022, art. 37, II",
+      "valid_from": "2025-01-01",
+      "valid_to": "2025-12-31",
+      "ceiling": 8157.41,
+      "pro_labore_rate": 0.11
+    },
+    {
+      "source": "Portaria Interministerial MPS/MF 13/2026; Lei 8.212/1991, arts. 21 e 30, § 4º; IN RFB 2.110/2022, art. 37, II",
+      "valid_from": "2026-01-01",
+      "valid_to": "2026-12-31",
+      "ceiling": 8475.55,
+      "pro_labore_rate": 0.11
+    }
+  ],
+  "irrf": [
+    {
+      "source": "Lei 11.482/2007, art. 1º (tabela mensal a partir de fevereiro de 2024, redação da Lei 14.848/2024); Lei 9.250/1995, art. 4º; Lei 9.430/1996, art. 67",
+      "valid_from": "2024-02-01",
+      "valid_to": "2025-04-30",
+      "brackets": [
+        { "up_to": 2259.20, "rate": 0.0, "deduction": 0.00 },
+        { "up_to": 2826.65, "rate": 0.075, "deduction": 169.44 },
+        { "up_to": 3751.05, "rate": 0.15, "deduction": 381.44 },
+        { "up_to": 4664.68, "rate": 0.225, "deduction": 662.77 },
+        { "up_to": null, "rate": 0.275, "deduction": 896.00 }
+      ],
+      "dependent_deduction": 189.59,
+      "simplified_discount": 564.80,
+      "min_withholding": 10.00
+    },
+    {
+      "source": "Lei 11.482/2007, art. 1º, XII (redação da Lei 15.191/2025); Lei 9.250/1995, art. 4º; Lei 9.430/1996, art. 67",
+      "valid_from": "2025-05-01",
+      "valid_to": null,
+      "brackets": [
+        { "up_to": 2428.80, "rate": 0.0, "deduction": 0.00 },
+        { "up_to": 2826.65, "rate": 0.075, "deduction": 182.16 },
+        { "up_to": 3751.05, "rate": 0.15, "deduction": 394.16 },
+        { "up_to": 4664.68, "rate": 0.225, "deduction": 675.49 },
+        { "up_to": null, "rate": 0.275, "deduction": 908.73 }
+      ],
+      "dependent_deduction": 189.59,
+      "simplified_discount": 607.20,
+      "min_withholding": 10.00
+    }
+  ],
+  "irrf_reduction": [
+    {
+      "source": "Lei 9.250/1995, art. 3º-A (incluído pela Lei 15.270/2025)",
+      "valid_from": "2026-01-01",
+      "valid_to": null,
+      "full_reduction_up_to": 5000.00,
+      "max_reduction": 312.89,
+      "phase_out_up_to": 7350.00,
+      "phase_out_constant": 978.62,
+      "phase_out_coefficient": 0.133145
+    }
+  ],
+  "mei": [
+    {
+      "source": "LC 123/2006, art. 18-A, §§ 1º, 2º, 4º, I, 7º, III e IV, e 10; Res. CGSN 140/2018, art. 100-A, VI",
+      "valid_from": "2018-01-01",
+      "valid_to": null,
+      "annual_limit": 81000.00,
+      "opening_year_monthly_limit": 6750.00,
+      "tolerance_ratio": 0.20,
+      "it_services_allowed": false,
+      "tax_free_distribution": {
+        "source": "LC 123/2006, art. 14; Res. CGSN 140/2018, art. 145, § 3º (32% da receita de serviços)",
+        "presumption": 0.32,
+        "unverified": true
+      }
+    }
+  ],
+  "mei_das": [
+    {
+      "source": "LC 123/2006, art. 18-A, § 3º, V; Lei 8.212/1991, art. 21, § 2º, II, a; salário mínimo de 2025",
+      "valid_from": "2025-01-01",
+      "valid_to": "2025-12-31",
+      "inss_rate_on_minimum_wage": 0.05,
+      "iss": 5.00
+    },
+    {
+      "source": "LC 123/2006, art. 18-A, § 3º, V; Lei 8.212/1991, art. 21, § 2º, II, a; salário mínimo de 2026",
+      "valid_from": "2026-01-01",
+      "valid_to": "2026-12-31",
+      "inss_rate_on_minimum_wage": 0.05,
+      "iss": 5.00
+    }
+  ],
+  "simples": [
+    {
+      "source": "LC 123/2006, art. 3º, I e II, art. 18, §§ 1º, 1º-A, 1º-B, 5º-J, 5º-M e 24, e Anexos III e V (redação da LC 155/2016); Res. CGSN 140/2018, arts. 21, 22 e 26",
+      "valid_from": "2018-01-01",
+      "valid_to": "2026-12-31",
+      "me_limit": 360000.00,
+      "epp_limit": 4800000.00,
+      "fator_r_threshold": 0.28,
+      "fator_r_without_revenue": 0.28,
+      "fator_r_without_payroll": 0.01,
+      "annex_iii": {
+        "iss_cap": 0.05,
+        "iss_excess_split": { "irpj": 0.0602, "csll": 0.0526, "cofins": 0.1928, "pis": 0.0418, "cpp": 0.6526 },
+        "brackets": [
+          {
+            "bracket": 1,
+            "rbt12_up_to": 180000.00,
+            "nominal_rate": 0.06,
+            "deduction": 0.00,
+            "split": { "irpj": 0.04, "csll": 0.035, "cofins": 0.1282, "pis": 0.0278, "cpp": 0.434, "iss": 0.335 }
+          },
+          {
+            "bracket": 2,
+            "rbt12_up_to": 360000.00,
+            "nominal_rate": 0.112,
+            "deduction": 9360.00,
+            "split": { "irpj": 0.04, "csll": 0.035, "cofins": 0.1405, "pis": 0.0305, "cpp": 0.434, "iss": 0.32 }
+          },
+          {
+            "bracket": 3,
+            "rbt12_up_to": 720000.00,
+            "nominal_rate": 0.135,
+            "deduction": 17640.00,
+            "split": { "irpj": 0.04, "csll": 0.035, "cofins": 0.1364, "pis": 0.0296, "cpp": 0.434, "iss": 0.325 }
+          },
+          {
+            "bracket": 4,
+            "rbt12_up_to": 1800000.00,
+            "nominal_rate": 0.16,
+            "deduction": 35640.00,
+            "split": { "irpj": 0.04, "csll": 0.035, "cofins": 0.1364, "pis": 0.0296, "cpp": 0.434, "iss": 0.325 }
+          },
+          {
+            "bracket": 5,
+            "rbt12_up_to": 3600000.00,
+            "nominal_rate": 0.21,
+            "deduction": 125640.00,
+            "split": { "irpj": 0.04, "csll": 0.035, "cofins": 0.1282, "pis": 0.0278, "cpp": 0.434, "iss": 0.335 }
+          },
+          {
+            "bracket": 6,
+            "rbt12_up_to": 4800000.00,
+            "nominal_rate": 0.33,
+            "deduction": 648000.00,
+            "split": { "irpj": 0.35, "csll": 0.15, "cofins": 0.1603, "pis": 0.0347, "cpp": 0.305, "iss": null }
+          }
+        ]
+      },
+      "annex_v": {
+        "iss_cap": 0.05,
+        "iss_excess_split": { "irpj": 0.3007, "csll": 0.1634, "cofins": 0.1843, "pis": 0.0399, "cpp": 0.3117 },
+        "brackets": [
+          {
+            "bracket": 1,
+            "rbt12_up_to": 180000.00,
+            "nominal_rate": 0.155,
+            "deduction": 0.00,
+            "split": { "irpj": 0.25, "csll": 0.15, "cofins": 0.141, "pis": 0.0305, "cpp": 0.2885, "iss": 0.14 }
+          },
+          {
+            "bracket": 2,
+            "rbt12_up_to": 360000.00,
+            "nominal_rate": 0.18,
+            "deduction": 4500.00,
+            "split": { "irpj": 0.23, "csll": 0.15, "cofins": 0.141, "pis": 0.0305, "cpp": 0.2785, "iss": 0.17 }
+          },
+          {
+            "bracket": 3,
+            "rbt12_up_to": 720000.00,
+            "nominal_rate": 0.195,
+            "deduction": 9900.00,
+            "split": { "irpj": 0.24, "csll": 0.15, "cofins": 0.1492, "pis": 0.0323, "cpp": 0.2385, "iss": 0.19 }
+          },
+          {
+            "bracket": 4,
+            "rbt12_up_to": 1800000.00,
+            "nominal_rate": 0.205,
+            "deduction": 17100.00,
+            "split": { "irpj": 0.21, "csll": 0.15, "cofins": 0.1574, "pis": 0.0341, "cpp": 0.2385, "iss": 0.21 }
+          },
+          {
+            "bracket": 5,
+            "rbt12_up_to": 3600000.00,
+            "nominal_rate": 0.23,
+            "deduction": 62100.00,
+            "split": { "irpj": 0.23, "csll": 0.125, "cofins": 0.141, "pis": 0.0305, "cpp": 0.2385, "iss": 0.235 }
+          },
+          {
+            "bracket": 6,
+            "rbt12_up_to": 4800000.00,
+            "nominal_rate": 0.305,
+            "deduction": 540000.00,
+            "split": { "irpj": 0.35, "csll": 0.155, "cofins": 0.1644, "pis": 0.0356, "cpp": 0.295, "iss": null }
+          }
+        ]
+      },
+      "tax_free_distribution": {
+        "source": "LC 123/2006, art. 14; Res. CGSN 140/2018, art. 145, § 1º (32% da receita menos o IRPJ do DAS)",
+        "presumption": 0.32
+      }
+    }
+  ],
+  "presumido": [
+    {
+      "source": "Lei 9.249/1995, arts. 3º, 15 e 20; Lei 7.689/1988, art. 3º, III; Lei 9.715/1998, art. 8º, I; Lei 9.718/1998, art. 8º; Lei 8.212/1991, art. 22, III",
+      "valid_from": "2025-01-01",
+      "valid_to": "2026-12-31",
+      "irpj_rate": 0.15,
+      "irpj_presumption": 0.32,
+      "irpj_surcharge_rate": 0.10,
+      "irpj_surcharge_monthly_threshold": 20000.00,
+      "csll_rate": 0.09,
+      "csll_presumption": 0.32,
+      "pis_rate": 0.0065,
+      "cofins_rate": 0.03,
+      "cpp_rate": 0.20,
+      "tax_free_distribution": {
+        "source": "IN RFB 1.700/2017, art. 238 (base presumida menos IRPJ, CSLL, PIS e Cofins)",
+        "presumption": 0.32,
+        "unverified": true
+      }
+    }
+  ],
+  "cnae_catalog": {
+    "source": "LC 123/2006, art. 18, §§ 5º-D, IV a VI, 5º-I, VI, IX e XII, 5º-J e 5º-M, II; Res. CGSN 140/2018, Anexo XI (ocupações do MEI); descrições das subclasses da CNAE (IBGE)",
+    "valid_from": "2026-01-01",
+    "valid_to": null,
+    "default_cnae": "6201-5/01",
+    "cnaes": [
+      {
+        "code": "6201-5/01",
+        "description": "Desenvolvimento de programas sob encomenda (inclui projeto e modelagem de banco de dados sob encomenda)",
+        "activity": "fatorR",
+        "mei_allowed": false,
+        "mei_occupation": null,
+        "note": null
+      },
+      {
+        "code": "6201-5/02",
+        "description": "Web design",
+        "activity": "fatorR",
+        "mei_allowed": false,
+        "mei_occupation": null,
+        "note": null
+      },
+      {
+        "code": "6202-3/00",
+        "description": "Desenvolvimento e licenciamento de software customizável",
+        "activity": "fatorR",
+        "mei_allowed": false,
+        "mei_occupation": null,
+        "note": null
+      },
+      {
+        "code": "6203-1/00",
+        "description": "Desenvolvimento e licenciamento de software não customizável",
+        "activity": "fatorR",
+        "mei_allowed": false,
+        "mei_occupation": null,
+        "note": null
+      },
+      {
+        "code": "6204-0/00",
+        "description": "Consultoria em tecnologia da informação",
+        "activity": "fatorR",
+        "mei_allowed": false,
+        "mei_occupation": null,
+        "note": null
+      },
+      {
+        "code": "6209-1/00",
+        "description": "Suporte técnico, manutenção e outros serviços de TI",
+        "activity": "fatorR",
+        "mei_allowed": false,
+        "mei_occupation": null,
+        "note": null
+      },
+      {
+        "code": "6311-9/00",
+        "description": "Tratamento de dados, provedores de aplicação e hospedagem",
+        "activity": "fatorR",
+        "mei_allowed": false,
+        "mei_occupation": null,
+        "note": "Anexo III ou V pelo Fator R, inferido ⚠ confirmar com contador"
+      },
+      {
+        "code": "6319-4/00",
+        "description": "Portais, provedores de conteúdo e outros serviços de informação",
+        "activity": "fatorR",
+        "mei_allowed": false,
+        "mei_occupation": null,
+        "note": "Anexo indefinido; o cálculo usa o Fator R ⚠ confirmar com contador"
+      },
+      {
+        "code": "7020-4/00",
+        "description": "Consultoria em gestão empresarial (inclui análise de dados para gestão)",
+        "activity": "fatorR",
+        "mei_allowed": false,
+        "mei_occupation": null,
+        "note": null
+      },
+      {
+        "code": "7490-1/99",
+        "description": "Outras atividades técnicas (inclui consultoria em estatística)",
+        "activity": "fatorR",
+        "mei_allowed": false,
+        "mei_occupation": null,
+        "note": "Anexo III ou V pelo Fator R ⚠ não verificado"
+      },
+      {
+        "code": "8599-6/03",
+        "description": "Treinamento em informática",
+        "activity": "annexIii",
+        "mei_allowed": true,
+        "mei_occupation": "Instrutor de informática",
+        "note": "Anexo III sem Fator R ⚠ não verificado"
+      },
+      {
+        "code": "9511-8/00",
+        "description": "Reparação e manutenção de computadores",
+        "activity": "annexIii",
+        "mei_allowed": true,
+        "mei_occupation": "Técnico de manutenção de computadores",
+        "note": "Anexo III sem Fator R ⚠ não verificado"
+      },
+      {
+        "code": "8219-9/99",
+        "description": "Preparação de documentos e apoio administrativo (digitação)",
+        "activity": "annexIii",
+        "mei_allowed": true,
+        "mei_occupation": "Digitador",
+        "note": "Anexo III sem Fator R ⚠ não verificado"
+      }
+    ]
+  }
+}

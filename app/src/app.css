@@ -1,0 +1,469 @@
+/* Design tokens + base styles. Neutral palette, one accent (indigo), 8px grid.
+   Light is the default; dark comes from prefers-color-scheme or an explicit data-theme. */
+
+:root {
+  color-scheme: light;
+
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', 'Liberation Sans',
+    Arial, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', 'SF Mono', Menlo, Consolas, 'Liberation Mono',
+    monospace;
+
+  /* spacing (8px grid, 4px half steps) */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-8: 48px;
+
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+
+  --header-h: 56px;
+  --sidebar-w: 264px;
+  --preview-w: 420px;
+
+  /* neutrals */
+  --bg: #f6f6f8;
+  --surface: #ffffff;
+  --surface-2: #f5f5f7;
+  --surface-3: #ebebef;
+  --border: #e4e4e9;
+  --border-strong: #d1d1d8;
+  --text: #18181d;
+  --text-2: #4a4a55;
+  --text-3: #6b6b76;
+
+  /* accent */
+  --accent: #3e63dd;
+  --accent-hover: #3558c8;
+  --accent-fg: #ffffff;
+  --accent-text: #3050c0;
+  --accent-soft: #eef2fd;
+  --accent-soft-2: #dde5fb;
+  --focus-ring: rgba(62, 99, 221, 0.55);
+
+  /* status */
+  --ok: #1a7f4e;
+  --ok-soft: #e8f5ee;
+  --warn: #945400;
+  --warn-soft: #fcf1de;
+  --danger: #c2322f;
+  --danger-soft: #fcebea;
+  /* money going out (despesas) */
+  --expense: #b8481f;
+  --expense-soft: #fcefe8;
+  --muted-badge: #595964;
+  --muted-soft: #efeff3;
+
+  /* page preview */
+  --page-shadow: 0 1px 2px rgba(16, 16, 24, 0.08), 0 0 0 1px rgba(16, 16, 24, 0.06);
+  --highlight-fill: rgba(62, 99, 221, 0.14);
+  --highlight-stroke: #3e63dd;
+  --canvas-bg: #eceef2;
+
+  --shadow-pop: 0 12px 32px rgba(18, 18, 28, 0.14), 0 2px 6px rgba(18, 18, 28, 0.06);
+  --overlay: rgba(18, 18, 28, 0.32);
+
+  /* charts (validated pair: accent + orange; greys are de-emphasis only) */
+  --viz-1: #3e63dd;
+  --viz-1-soft: rgba(62, 99, 221, 0.28);
+  --viz-2: #eb6834;
+  --viz-muted: #d3d3da;
+  --viz-track: #e3e8fb;
+  --viz-warn: #e0930b;
+  --viz-danger: #d6453f;
+  --viz-axis: #d1d1d8;
+
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Dark tokens: explicit choice... */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0e0f12;
+  --surface: #16171b;
+  --surface-2: #1c1d22;
+  --surface-3: #25262d;
+  --border: #292a31;
+  --border-strong: #383943;
+  --text: #ececf1;
+  --text-2: #b5b5c0;
+  --text-3: #8e8e9a;
+  --accent: #4468e0;
+  --accent-hover: #5577e8;
+  --accent-fg: #ffffff;
+  --accent-text: #93abff;
+  --accent-soft: rgba(99, 132, 255, 0.12);
+  --accent-soft-2: rgba(99, 132, 255, 0.22);
+  --focus-ring: rgba(130, 158, 255, 0.7);
+  --ok: #58c792;
+  --ok-soft: rgba(88, 199, 146, 0.12);
+  --warn: #f1b75a;
+  --warn-soft: rgba(241, 183, 90, 0.12);
+  --danger: #ff8a85;
+  --danger-soft: rgba(255, 120, 115, 0.12);
+  --expense: #f29a74;
+  --expense-soft: rgba(242, 154, 116, 0.12);
+  --muted-badge: #b5b5c0;
+  --muted-soft: rgba(255, 255, 255, 0.07);
+  --page-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --highlight-fill: rgba(110, 140, 255, 0.2);
+  --highlight-stroke: #6f8cff;
+  --canvas-bg: #101114;
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --overlay: rgba(0, 0, 0, 0.55);
+  --viz-1: #6283f5;
+  --viz-1-soft: rgba(98, 131, 245, 0.3);
+  --viz-2: #d95926;
+  --viz-muted: #3b3c45;
+  --viz-track: rgba(98, 131, 245, 0.2);
+  --viz-warn: #f1b75a;
+  --viz-danger: #ff8a85;
+  --viz-axis: #383943;
+}
+
+/* ...or the system preference when no explicit light choice was made. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #0e0f12;
+    --surface: #16171b;
+    --surface-2: #1c1d22;
+    --surface-3: #25262d;
+    --border: #292a31;
+    --border-strong: #383943;
+    --text: #ececf1;
+    --text-2: #b5b5c0;
+    --text-3: #8e8e9a;
+    --accent: #4468e0;
+    --accent-hover: #5577e8;
+    --accent-fg: #ffffff;
+    --accent-text: #93abff;
+    --accent-soft: rgba(99, 132, 255, 0.12);
+    --accent-soft-2: rgba(99, 132, 255, 0.22);
+    --focus-ring: rgba(130, 158, 255, 0.7);
+    --ok: #58c792;
+    --ok-soft: rgba(88, 199, 146, 0.12);
+    --warn: #f1b75a;
+    --warn-soft: rgba(241, 183, 90, 0.12);
+    --danger: #ff8a85;
+    --danger-soft: rgba(255, 120, 115, 0.12);
+    --expense: #f29a74;
+    --expense-soft: rgba(242, 154, 116, 0.12);
+    --muted-badge: #b5b5c0;
+    --muted-soft: rgba(255, 255, 255, 0.07);
+    --page-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 2px 8px rgba(0, 0, 0, 0.4);
+    --highlight-fill: rgba(110, 140, 255, 0.2);
+    --highlight-stroke: #6f8cff;
+    --canvas-bg: #101114;
+    --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --overlay: rgba(0, 0, 0, 0.55);
+    --viz-1: #6283f5;
+    --viz-1-soft: rgba(98, 131, 245, 0.3);
+    --viz-2: #d95926;
+    --viz-muted: #3b3c45;
+    --viz-track: rgba(98, 131, 245, 0.2);
+    --viz-warn: #f1b75a;
+    --viz-danger: #ff8a85;
+    --viz-axis: #383943;
+  }
+}
+
+@media (max-width: 1100px) {
+  :root {
+    --sidebar-w: 236px;
+  }
+}
+
+/* ---------------------------------------------------------------- base */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+#app {
+  height: 100%;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--accent-soft-2);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.muted {
+  color: var(--text-3);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+input[type='checkbox'] {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    background-color 0.12s var(--ease),
+    border-color 0.12s var(--ease),
+    color 0.12s var(--ease),
+    box-shadow 0.12s var(--ease);
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.btn:active:not(:disabled) {
+  background: var(--surface-3);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn svg {
+  flex: none;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btn-primary:active:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.btn-danger {
+  color: var(--danger);
+}
+
+.btn-sm {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12.5px;
+}
+
+.btn-icon {
+  width: 32px;
+  padding: 0;
+}
+
+.btn-icon.btn-sm {
+  width: 28px;
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-text);
+  font-size: inherit;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.12s var(--ease);
+}
+
+.link:hover {
+  text-decoration-color: currentColor;
+}
+
+/* ---------------------------------------------------------------- inputs */
+
+.input {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 13px;
+  transition:
+    border-color 0.12s var(--ease),
+    box-shadow 0.12s var(--ease);
+}
+
+.input::placeholder {
+  color: var(--text-3);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft-2);
+}
+
+.input:disabled {
+  opacity: 0.55;
+}
+
+.input[aria-invalid='true'] {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
+/* ---------------------------------------------------------------- pills (status + label) */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.pill.accent {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.pill.ok {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.pill.warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.pill.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* ---------------------------------------------------------------- misc */
+
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  opacity: 0.8;
+  flex: none;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Permissions of the main window: pick files/folders, save the CSV and open PDFs in the system viewer.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [{ "path": "**/*.pdf" }, { "path": "**/*.PDF" }]
+    },
+    "opener:allow-reveal-item-in-dir"
+  ]
+}

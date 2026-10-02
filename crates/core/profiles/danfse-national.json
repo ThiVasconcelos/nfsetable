@@ -1,0 +1,54 @@
+{
+  "id": "danfse-national",
+  "name": "DANFSe (padrão nacional)",
+  "builtin": true,
+  "fingerprint": ["danfse"],
+  "docType": "NFS-e",
+  "kind": "revenue",
+  "fields": {
+    "net_value": [
+      {
+        "type": "anchor",
+        "pattern": "valor\\s*liquido\\s*da\\s*nfs-?e",
+        "excludeSuffix": "^\\s*\\+",
+        "direction": "below",
+        "maxDistance": 24
+      },
+      {
+        "type": "anchor",
+        "pattern": "valor\\s*liquido\\s*da\\s*nfs-?e",
+        "excludeSuffix": "^\\s*\\+",
+        "direction": "right",
+        "maxDistance": 250
+      }
+    ],
+    "service_value": [
+      {
+        "type": "anchor",
+        "pattern": "valor\\s*do\\s*servico",
+        "direction": "below",
+        "maxDistance": 24
+      },
+      {
+        "type": "anchor",
+        "pattern": "valor\\s*da\\s*operacao",
+        "direction": "below",
+        "maxDistance": 24
+      }
+    ],
+    "competence": [
+      {
+        "type": "anchor",
+        "pattern": "competencia\\s*da\\s*nfs-?e",
+        "direction": "below",
+        "maxDistance": 24
+      },
+      {
+        "type": "anchor",
+        "pattern": "data\\s*e\\s*hora\\s*da\\s*emissao\\s*da\\s*nfs-?e",
+        "direction": "below",
+        "maxDistance": 24
+      }
+    ]
+  }
+}

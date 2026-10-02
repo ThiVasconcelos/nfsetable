@@ -1,0 +1,22 @@
+# Rust
+target/
+
+# Frontend
+node_modules/
+app/dist/
+
+# Tauri generated schemas
+app/src-tauri/gen/
+
+# PDFium binaries (downloaded by scripts/fetch-pdfium.*)
+vendor/
+
+# Misc
+*.log
+.DS_Store
+__pycache__/
+.venv/
+*.stackdump
+
+# Local notes (architecture, roadmap, tax research), kept out of the repository
+docs/
