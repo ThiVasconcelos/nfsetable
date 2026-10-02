@@ -43,6 +43,8 @@ export class StoreDoc<T> {
 
   #options: StoreDocOptions<T>
   #timer: ReturnType<typeof setTimeout> | undefined
+  /** A change is not in any write yet (saveState alone can be overwritten by an older write). */
+  #pending = false
   #seq = 0
   #writes: Promise<unknown> = Promise.resolve()
   #toastedError: string | null = null
@@ -59,6 +61,7 @@ export class StoreDoc<T> {
    */
   async read(): Promise<unknown> {
     clearTimeout(this.#timer)
+    this.#pending = false
     this.loaded = false
     this.readBlocked = false
     this.saveState = 'idle'
@@ -86,6 +89,7 @@ export class StoreDoc<T> {
   changed() {
     if (!this.loaded || this.readBlocked) return
     clearTimeout(this.#timer)
+    this.#pending = true
     this.saveState = 'pending'
     this.#timer = setTimeout(() => void this.saveNow(), this.#options.delayMs ?? DEFAULT_DELAY_MS)
   }
@@ -99,11 +103,13 @@ export class StoreDoc<T> {
     // The target is fixed now: a later change of document (another company) does not redirect it.
     const name = this.name
     const value = this.#options.snapshot()
+    this.#pending = false
     const write = async (): Promise<boolean> => {
       if (seq !== this.#seq) return true // a newer write is queued and will save this state
       try {
         await api.writeStore(name, value)
-        if (seq === this.#seq) {
+        // A change made while writing is still waiting for its own save.
+        if (seq === this.#seq && !this.#pending) {
           this.saveState = 'saved'
           this.saveError = null
         }
@@ -129,7 +135,7 @@ export class StoreDoc<T> {
 
   /** Saves right away if a save is waiting; resolves when every write is done. */
   async flush(): Promise<void> {
-    if (this.loaded && this.saveState === 'pending') await this.saveNow()
+    if (this.loaded && this.#pending) await this.saveNow()
     else await this.#writes
   }
 
