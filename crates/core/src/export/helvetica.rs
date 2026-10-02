@@ -4,7 +4,9 @@
 //! PDFium's glyph API finds no glyphs in these fonts, so the advance widths come from the Adobe
 //! font metrics (AFM) of the standard 14 fonts, which PDF viewers use for them. A unit test checks
 //! them against PDFium: they all match except "±", "÷", "µ", "·" and "¯", which PDFium's built-in
-//! Helvetica replacement draws a little wider or narrower (the AFM value is kept for those).
+//! Helvetica replacement draws a little wider or narrower, and a few symbols whose width depends on
+//! the replacement font PDFium picks on each system (on Linux "«", "»", "€", "›", and "@" and "€"
+//! in bold). The AFM value is kept for all of them.
 
 use unicode_normalization::char::decompose_compatible;
 
@@ -307,8 +309,17 @@ mod tests {
     /// advance of `c` is the growth of the bounds of "HH" when `c` is put between the two "H".
     #[test]
     fn widths_match_pdfium() {
-        // Drawn by PDFium with other advances (see the module documentation).
+        // Drawn by PDFium with other advances (see the module documentation): on every system,
         const PDFIUM_DIFFERS: [char; 5] = ['±', '÷', 'µ', '·', '¯'];
+        // and where the replacement font differs (the Linux CI runner draws these 6% to 30% wider).
+        const REPLACEMENT_DIFFERS: [(Font, char); 6] = [
+            (Font::Regular, '«'),
+            (Font::Regular, '»'),
+            (Font::Regular, '€'),
+            (Font::Regular, '›'),
+            (Font::Bold, '@'),
+            (Font::Bold, '€'),
+        ];
         let engine =
             Engine::new(&[dev_pdfium_dir()]).expect("PDFium not found: run scripts/fetch-pdfium");
         let _pdfium = engine.lock();
@@ -333,6 +344,9 @@ mod tests {
         for (font, token) in fonts {
             let base = bounds_width("HH", token);
             for c in chars.clone() {
+                if REPLACEMENT_DIFFERS.contains(&(font, c)) {
+                    continue;
+                }
                 let advance = (bounds_width(&format!("H{c}H"), token) - base) * 1000.0 / size;
                 let expected = f32::from(char_units(c, font));
                 if (advance - expected).abs() > 1.0 {
