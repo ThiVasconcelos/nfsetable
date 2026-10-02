@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import * as api from './lib/api'
   import AppFooter from './components/AppFooter.svelte'
   import AppHeader from './components/AppHeader.svelte'
   import CompanyDialogs from './components/CompanyDialogs.svelte'
@@ -24,6 +25,8 @@
   import { store } from './lib/store.svelte'
   import { tax } from './lib/tax.svelte'
 
+  const CLOSE_WAIT_MS = 3000
+
   /** Preview zoom, kept while browsing rows. */
   let zoom = $state(1)
   let windowWidth = $state(1280)
@@ -42,9 +45,23 @@
     }
     document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('pagehide', flushAll)
+    // Closing the window waits for the pending saves (the delayed ones would be lost otherwise),
+    // never more than a few seconds.
+    const saveBeforeClose = () =>
+      Promise.race([
+        Promise.all([
+          tax.flush(),
+          store.notesDoc.flush(),
+          companies.doc.flush(),
+          api.saveCachedResults().catch(() => {}),
+        ]).then(() => {}),
+        new Promise<void>((resolve) => setTimeout(resolve, CLOSE_WAIT_MS)),
+      ])
+    const closing = api.onCloseRequested(saveBeforeClose)
     return () => {
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('pagehide', flushAll)
+      void closing.then((unlisten) => unlisten())
     }
   })
 

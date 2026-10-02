@@ -1,10 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissions of the main window: pick files/folders, save the CSV and open PDFs in the system viewer.",
+  "description": "Permissions of the main window: pick files/folders, save the CSV, open PDFs in the system viewer, and close the window once pending saves are written.",
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:window:allow-destroy",
     "dialog:allow-open",
     "dialog:allow-save",
     {

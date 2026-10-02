@@ -1643,6 +1643,13 @@ export function createMockBackend(): Backend {
       throw 'No modo demonstração (navegador) não é possível abrir pastas.'
     },
 
+    async onCloseRequested(handler: () => Promise<void>): Promise<Unlisten> {
+      // A browser tab cannot wait: the handler starts when the page goes away.
+      const run = () => void handler()
+      window.addEventListener('pagehide', run)
+      return () => window.removeEventListener('pagehide', run)
+    },
+
     async onDragDrop(handler: (state: DragDropState) => void): Promise<Unlisten> {
       // Browsers do not expose file paths: a drop adds the next synthetic folder.
       let depth = 0

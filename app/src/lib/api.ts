@@ -9,6 +9,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { open, save } from '@tauri-apps/plugin-dialog'
 import { openPath as openerOpenPath, revealItemInDir as openerReveal } from '@tauri-apps/plugin-opener'
 import { EXPORT_FORMATS } from './labels'
@@ -66,6 +67,7 @@ export interface Backend {
   openPath(path: string): Promise<void>
   revealItemInDir(path: string): Promise<void>
   onDragDrop(handler: (state: DragDropState) => void): Promise<Unlisten>
+  onCloseRequested(handler: () => Promise<void>): Promise<Unlisten>
 }
 
 /** True inside the Tauri webview. */
@@ -135,6 +137,9 @@ const tauriBackend: Backend = {
       else if (payload.type === 'leave') handler({ type: 'leave' })
       else handler({ type: 'over' })
     }),
+
+  // The window is destroyed once the handler resolves.
+  onCloseRequested: (handler) => getCurrentWindow().onCloseRequested(() => handler()),
 }
 
 let mockBackend: Promise<Backend> | null = null
@@ -250,6 +255,10 @@ export const onTestProgress = async (handler: (progress: Progress) => void): Pro
 /** Files/folders dragged from the OS onto the window (Tauri drag & drop). */
 export const onDragDrop = async (handler: (state: DragDropState) => void): Promise<Unlisten> =>
   (await backend()).onDragDrop(handler)
+
+/** The window is about to close: it waits for `handler` (e.g. pending saves) first. */
+export const onCloseRequested = async (handler: () => Promise<void>): Promise<Unlisten> =>
+  (await backend()).onCloseRequested(handler)
 
 // ---------------------------------------------------------------- dialogs & opener
 
