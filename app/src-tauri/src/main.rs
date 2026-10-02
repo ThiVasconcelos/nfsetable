@@ -5,6 +5,7 @@ mod commands;
 mod data_dir;
 mod files;
 mod profiles;
+mod results;
 mod store;
 
 use commands::AppState;
@@ -37,7 +38,9 @@ fn main() {
             commands::app_info,
             commands::set_data_dir,
             commands::scan_sources,
+            commands::cached_results,
             commands::extract_documents,
+            commands::save_cached_results,
             commands::render_page,
             commands::read_region,
             commands::test_rule,

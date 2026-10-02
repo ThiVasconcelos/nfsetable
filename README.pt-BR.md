@@ -24,6 +24,7 @@ Aponte a pasta das notas, confira os valores e veja o total da seleção. Tudo r
 
 - Lê pastas inteiras (com ou sem subpastas) e arquivos soltos. Você pode remover itens (um a um ou
   todos os selecionados) e ignorar arquivos pelo nome (por padrão, os que contêm "cancelada").
+  O que já foi lido fica guardado: ao abrir o app de novo, só os arquivos novos ou alterados são lidos.
 - Encontra sozinho o **valor líquido**, o **valor do serviço** (bruto) e a **competência**:
   - DANFSe do padrão nacional (layout até 2025 e layout 2026 com IBS/CBS), que é o que todo MEI
     e os municípios do padrão nacional emitem;

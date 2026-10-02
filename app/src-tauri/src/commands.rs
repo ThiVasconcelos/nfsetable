@@ -1,15 +1,17 @@
 //! Tauri commands: thin wrappers over `nfsetable-core`. Heavy work runs on the blocking thread pool so
 //! the UI never freezes; long batches report progress through events.
 
+use crate::results::{self, ResultCache};
 use crate::{data_dir, profiles, store};
 use nfsetable_core::{
     builtin_fields, builtin_profiles, AppInfo, DocResult, Engine, ExportRequest, FieldDef, Profile,
     Progress, Rect, RegionRead, RenderedPage, Rule, RuleTest, ScanOptions, ScanResult, TaxCatalog,
     TaxInput, TaxReport, NET_VALUE_FIELD,
 };
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use std::sync::{Arc, PoisonError, RwLock};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock};
 use tauri::{AppHandle, Emitter, State};
 
 pub const EXTRACT_PROGRESS: &str = "extract-progress";
@@ -24,6 +26,10 @@ pub struct AppState {
     /// Folder with the profiles and stored documents; can be changed at runtime.
     data_dir: RwLock<PathBuf>,
     data_dir_error: RwLock<Option<String>>,
+    /// Extraction results of earlier runs, kept in the data folder in use.
+    results: Arc<Mutex<ResultCache>>,
+    /// Held while the results are written, so writes land one at a time and in order.
+    results_writer: Arc<Mutex<()>>,
 }
 
 impl AppState {
@@ -31,6 +37,8 @@ impl AppState {
         let (data_dir, data_dir_error) = data_dir::resolve(&default_dir);
         AppState {
             engine: engine.map(Arc::new),
+            results: Arc::new(Mutex::new(ResultCache::load(&data_dir))),
+            results_writer: Arc::new(Mutex::new(())),
             default_dir,
             data_dir: RwLock::new(data_dir),
             data_dir_error: RwLock::new(data_dir_error),
@@ -43,6 +51,26 @@ impl AppState {
 
     fn data_dir(&self) -> PathBuf {
         read_lock(&self.data_dir)
+    }
+
+    fn results(&self) -> MutexGuard<'_, ResultCache> {
+        lock(&self.results)
+    }
+
+    /// Writes the kept results if they changed, off the async runtime.
+    async fn save_results(&self) -> Result<(), String> {
+        let (results, writer) = (self.results.clone(), self.results_writer.clone());
+        blocking(move || {
+            let _turn = lock(&writer);
+            let Some((path, json)) = lock(&results).pending_save() else {
+                return Ok(());
+            };
+            results::write(&path, &json).map_err(|e| {
+                lock(&results).save_failed();
+                format!("Não foi possível guardar as leituras: {e}")
+            })
+        })
+        .await?
     }
 
     fn profiles_dir(&self) -> PathBuf {
@@ -83,6 +111,11 @@ fn net_value_field() -> FieldDef {
 /// The value behind `lock`; a lock poisoned by a panic still holds a usable value.
 fn read_lock<T: Clone>(lock: &RwLock<T>) -> T {
     lock.read().unwrap_or_else(PoisonError::into_inner).clone()
+}
+
+/// The value behind a mutex (poisoned or not).
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 /// Replaces the value behind `lock` (poisoned or not).
@@ -144,6 +177,15 @@ pub fn set_data_dir(
         target.as_deref(),
         copy,
     )?;
+    // The results kept so far stay with the old folder; the new folder has its own.
+    {
+        let _turn = lock(&state.results_writer);
+        let pending = state.results().pending_save();
+        if let Some((old_path, json)) = pending {
+            let _ = results::write(&old_path, &json);
+        }
+    }
+    *state.results() = ResultCache::load(&new_dir);
     set_lock(&state.data_dir, new_dir);
     set_lock(&state.data_dir_error, None);
     Ok(state.info(&app))
@@ -154,21 +196,57 @@ pub async fn scan_sources(options: ScanOptions) -> Result<ScanResult, String> {
     blocking(move || nfsetable_core::scan(&options)).await
 }
 
+/// Results read in earlier runs for these cache keys (see `extract_documents`), valid for the
+/// current profiles.
+#[tauri::command]
+pub async fn cached_results(
+    state: State<'_, AppState>,
+    keys: Vec<String>,
+) -> Result<HashMap<String, DocResult>, String> {
+    let key = results::key(&state.all_profiles());
+    Ok(state.results().get(&key, &keys))
+}
+
+/// Extracts `paths` and keeps the results for the next runs under `keys` (same order: the UI's
+/// cache key of each file, empty for files the scan could not read).
 #[tauri::command]
 pub async fn extract_documents(
     app: AppHandle,
     state: State<'_, AppState>,
     paths: Vec<String>,
+    keys: Vec<String>,
 ) -> Result<Vec<DocResult>, String> {
+    if keys.len() != paths.len() {
+        return Err("Erro interno: uma chave por arquivo.".to_string());
+    }
     let engine = state.engine()?;
     let profiles = state.all_profiles();
+    let key = results::key(&profiles);
     let fields = builtin_fields();
-    blocking(move || {
+    let docs = blocking(move || {
         map_with_progress(&app, EXTRACT_PROGRESS, &paths, |path| {
             engine.extract(path, &profiles, &fields)
         })
     })
-    .await
+    .await?;
+    let due = {
+        let mut cache = state.results();
+        for (doc, id) in docs.iter().zip(&keys) {
+            cache.insert(&key, id, doc);
+        }
+        cache.save_due()
+    };
+    if due {
+        // A long reading keeps what it read even if the app closes before the end.
+        let _ = state.save_results().await;
+    }
+    Ok(docs)
+}
+
+/// Writes the kept results to disk (the UI calls it when a reading ends).
+#[tauri::command]
+pub async fn save_cached_results(state: State<'_, AppState>) -> Result<(), String> {
+    state.save_results().await
 }
 
 #[tauri::command]

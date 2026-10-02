@@ -35,6 +35,7 @@ It runs on Windows, Linux and macOS and is built with Tauri 2, Rust, PDFium and 
 
 - Reads whole folders (with or without subfolders) and single files. Remove items one by one or all
   selected at once, and ignore files by name (by default, those containing "cancelada").
+  What was read is kept, so the next time the app opens only new or changed files are read.
 - Finds the **net value** (valor líquido), the **service value** (valor do serviço, the gross
   amount) and the **competence month** (competência, the month the service belongs to for tax
   purposes) in:

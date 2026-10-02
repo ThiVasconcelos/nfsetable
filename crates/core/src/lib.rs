@@ -28,12 +28,13 @@ pub mod scan;
 pub mod tax;
 pub mod text;
 
-pub use engine::{dev_pdfium_dir, Engine, PDFIUM_ENV_VAR, PDFIUM_PLATFORM};
+pub use engine::{dev_pdfium_dir, Engine, EXTRACTION_VERSION, PDFIUM_ENV_VAR, PDFIUM_PLATFORM};
 pub use error::CoreError;
 pub use export::{export_csv, export_table};
 pub use model::*;
 pub use profile::{
-    builtin_fields, builtin_profiles, COMPETENCE_FIELD, NET_VALUE_FIELD, SERVICE_VALUE_FIELD,
+    builtin_fields, builtin_profiles, profiles_fingerprint, COMPETENCE_FIELD, NET_VALUE_FIELD,
+    SERVICE_VALUE_FIELD,
 };
 pub use scan::scan;
 pub use tax::{tax_catalog, tax_report};

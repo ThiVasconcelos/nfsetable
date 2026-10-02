@@ -42,7 +42,9 @@ export interface Backend {
   appInfo(): Promise<AppInfo>
   setDataDir(path: string | null, copy: boolean): Promise<AppInfo>
   scanSources(options: ScanOptions): Promise<ScanResult>
-  extractDocuments(paths: string[]): Promise<DocResult[]>
+  cachedResults(keys: string[]): Promise<Record<string, DocResult>>
+  extractDocuments(paths: string[], keys: string[]): Promise<DocResult[]>
+  saveCachedResults(): Promise<void>
   renderPage(path: string, page: number, width: number): Promise<RenderedPage>
   readRegion(path: string, page: number, rect: Rect): Promise<RegionRead>
   testRule(paths: string[], rule: Rule): Promise<RuleTest[]>
@@ -81,7 +83,9 @@ const tauriBackend: Backend = {
   appInfo: () => invoke<AppInfo>('app_info'),
   setDataDir: (path, copy) => invoke<AppInfo>('set_data_dir', { path, copy }),
   scanSources: (options) => invoke<ScanResult>('scan_sources', { options }),
-  extractDocuments: (paths) => invoke<DocResult[]>('extract_documents', { paths }),
+  cachedResults: (keys) => invoke<Record<string, DocResult>>('cached_results', { keys }),
+  extractDocuments: (paths, keys) => invoke<DocResult[]>('extract_documents', { paths, keys }),
+  saveCachedResults: () => invoke<void>('save_cached_results'),
   renderPage: (path, page, width) => invoke<RenderedPage>('render_page', { path, page, width }),
   readRegion: (path, page, rect) => invoke<RegionRead>('read_region', { path, page, rect }),
   testRule: (paths, rule) => invoke<RuleTest[]>('test_rule', { paths, rule }),
@@ -173,9 +177,19 @@ export const setDataDir = async (path: string | null, copy: boolean): Promise<Ap
 export const scanSources = async (options: ScanOptions): Promise<ScanResult> =>
   (await backend()).scanSources(options)
 
-/** `extract_documents(paths)`; emits "extract-progress". */
-export const extractDocuments = async (paths: string[]): Promise<DocResult[]> =>
-  (await backend()).extractDocuments(paths)
+/** `cached_results(keys)`: results of earlier runs by cache key, valid for the current profiles. */
+export const cachedResults = async (keys: string[]): Promise<Record<string, DocResult>> =>
+  (await backend()).cachedResults(keys)
+
+/**
+ * `extract_documents(paths, keys)`: `keys[i]` is the cache key of `paths[i]` (kept for the next
+ * runs; empty when the scan could not read the file); emits "extract-progress".
+ */
+export const extractDocuments = async (paths: string[], keys: string[]): Promise<DocResult[]> =>
+  (await backend()).extractDocuments(paths, keys)
+
+/** `save_cached_results()`: writes the results kept by `extract_documents` to disk. */
+export const saveCachedResults = async (): Promise<void> => (await backend()).saveCachedResults()
 
 /** `render_page(path, page, width)`; `width` is the target width in pixels. */
 export const renderPage = async (path: string, page: number, width: number): Promise<RenderedPage> =>

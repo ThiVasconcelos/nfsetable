@@ -42,6 +42,7 @@ app/src-tauri/src/           nfsetable binary
   store.rs                   JSON documents in <data folder>/store/<name>.json
   data_dir.rs                data folder choice (config.json in the default folder)
   profiles.rs                user profiles in <data folder>/profiles/*.json
+  results.rs                 extraction results kept between runs (<data folder>/cache)
 app/src/                     Svelte 5 UI (runes); all text in pt-BR
   lib/api.ts                 typed wrappers of every command (the mock outside Tauri)
   lib/types.ts               TypeScript mirror of model.rs
@@ -56,8 +57,11 @@ scripts/                     fetch-pdfium.sh, fetch-pdfium.ps1
 ```
 
 Persisted data: the data folder holds `profiles/` and `store/` (`companies`, and per company
-`notes-<id>` and `planning-<id>`). localStorage keeps only UI preferences (theme, sort, startup
-choice); keys left by the first versions are migrated into the store once.
+`notes-<id>` and `planning-<id>`), plus `cache/results.json`: extraction results by file SHA-256
+and name, valid only for the same `EXTRACTION_VERSION`, build and profiles, so opening the app reads
+only new or changed files.
+localStorage keeps only UI preferences (theme, sort, startup choice); keys left by the first
+versions are migrated into the store once.
 
 ## Commands
 
@@ -224,7 +228,7 @@ patterns nobody can review.
 | I want to… | Go to |
 |---|---|
 | support a new invoice layout | `crates/core/profiles/` + `profile.rs`, fixture in `gen_fixtures.rs`, test in `tests/extraction.rs` |
-| change the automatic heuristic | `AUTO_*_LABELS` in `crates/core/src/extract.rs` |
+| change the automatic heuristic | `AUTO_*_LABELS` in `crates/core/src/extract.rs` (any change in what a PDF reads to: bump `EXTRACTION_VERSION` in `engine.rs`) |
 | change how lines and columns are built | `crates/core/src/layout.rs` |
 | update tax values (new year) | `crates/core/tax/br.json` + `crates/core/tests/tax.rs` (+ `mock-tax.ts`) |
 | change a tax calculation | `crates/core/src/tax/` + `tests/tax.rs` + `app/src/lib/mock-tax.ts` |

@@ -38,6 +38,11 @@ pub const PDFIUM_PLATFORM: &str = "unsupported";
 /// Environment variable naming an extra folder where the PDFium library is searched.
 pub const PDFIUM_ENV_VAR: &str = "PDFIUM_LIB_DIR";
 
+/// Version of what [`Engine::extract`] returns for a given file and profiles. The app keeps
+/// results between runs under this number, so bump it whenever a change in the reading (layout,
+/// rules, heuristics, built-in profiles, fields) can change the result for the same PDF.
+pub const EXTRACTION_VERSION: u32 = 1;
+
 /// The PDFium folder of a development checkout, `vendor/pdfium/<platform>` at the repository root
 /// (filled by `scripts/fetch-pdfium`): for tests, examples and debug builds.
 #[doc(hidden)]

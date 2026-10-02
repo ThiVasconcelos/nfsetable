@@ -251,6 +251,15 @@ function isKind(value: unknown): value is DocKind {
   return value === 'revenue' || value === 'expense'
 }
 
+/**
+ * Key of a file's extraction result: its content and its name, since profiles may match by name
+ * (the same content under another name can read differently). Empty when the scan could not read
+ * the file.
+ */
+function cacheKey(f: ScannedFile): string {
+  return f.hash ? `${f.hash}:${normalizeText(f.name)}` : ''
+}
+
 /** Overrides keeping only well-typed fields. */
 function parseOverrides(raw: unknown): Record<string, Override> {
   const out: Record<string, Override> = {}
@@ -806,7 +815,10 @@ export class AppStore {
     if (!this.#running) void this.#runLoop()
   }
 
-  /** Forgets cached results (e.g. the profiles changed): the next scan reads every file again. */
+  /**
+   * Forgets the results kept in memory (e.g. the profiles changed). The backend keeps its own,
+   * valid only for the profiles they were read with, so the next scan reads what changed.
+   */
   forgetCache() {
     this.#cache.clear()
     this.#generation++
@@ -848,11 +860,20 @@ export class AppStore {
     const scan = await api.scanSources({ sources, exclude: $state.snapshot(this.exclude) })
     if (this.#dirty || generation !== this.#generation) return
 
+    // Results of earlier runs (same profiles) come from the backend instead of being read again.
+    const unknown = [...new Set(scan.files.map(cacheKey).filter((k) => k && !this.#cache.has(k)))]
+    if (unknown.length) {
+      const known = await api.cachedResults(unknown).catch((): Record<string, DocResult> => ({}))
+      if (this.#dirty || generation !== this.#generation) return
+      for (const [hash, result] of Object.entries(known)) this.#cache.set(hash, result)
+    }
+
     const previousHash = new Map((this.scan?.files ?? []).map((f) => [f.path, f.hash]))
     const results: Record<string, DocResult> = {}
     const todo: string[] = []
     for (const f of scan.files) {
-      const cached = this.#cache.get(f.hash)
+      const key = cacheKey(f)
+      const cached = key ? this.#cache.get(key) : undefined
       if (cached) {
         results[f.path] = cached.path === f.path ? cached : { ...cached, path: f.path }
         continue
@@ -878,7 +899,11 @@ export class AppStore {
       let docs: DocResult[]
       let failed = false
       try {
-        docs = await api.extractDocuments(chunk)
+        const keys = chunk.map((path) => {
+          const f = fileByPath.get(path)
+          return f ? cacheKey(f) : ''
+        })
+        docs = await api.extractDocuments(chunk, keys)
       } catch (e) {
         failed = true
         const message = errorMessage(e)
@@ -895,12 +920,15 @@ export class AppStore {
         const result = doc.path === path ? doc : { ...doc, path }
         next[path] = result
         const file = fileByPath.get(path)
-        if (file && !failed) this.#cache.set(file.hash, result)
+        const key = file ? cacheKey(file) : ''
+        if (key && !failed) this.#cache.set(key, result)
       })
       fillDuplicates(scan.files, next)
       this.results = next
       this.progress = { done: Math.min(todo.length, i + chunk.length), total: todo.length }
     }
+    // Next time the app opens, these files are not read again.
+    void api.saveCachedResults().catch(() => {})
   }
 
   /** Drops selection/preview state that points to files no longer listed. */

@@ -4,6 +4,7 @@ use crate::error::CoreError;
 use crate::model::{FieldDef, FieldKind, Profile, Rule};
 use crate::regex_cache::compiled;
 use crate::text::{compact, normalize};
+use sha2::{Digest, Sha256};
 
 /// Id of the built-in net value field ("Valor líquido", required).
 pub const NET_VALUE_FIELD: &str = "net_value";
@@ -41,6 +42,13 @@ pub fn builtin_fields() -> Vec<FieldDef> {
             required: false,
         },
     ]
+}
+
+/// SHA-256 of `profiles` as JSON: it changes whenever any profile changes, so results read with
+/// other profiles can be told apart.
+pub fn profiles_fingerprint(profiles: &[Profile]) -> String {
+    let json = serde_json::to_vec(profiles).unwrap_or_default();
+    format!("{:x}", Sha256::digest(&json))
 }
 
 /// Built-in extraction profiles (always `builtin: true`).
@@ -190,6 +198,18 @@ pub fn validate_rule(rule: &Rule) -> Result<(), CoreError> {
 mod tests {
     use super::*;
     use crate::model::Direction;
+
+    #[test]
+    fn fingerprint_follows_every_profile_change() {
+        let profiles = builtin_profiles();
+        let base = profiles_fingerprint(&profiles);
+        assert_eq!(base.len(), 64);
+        assert_eq!(profiles_fingerprint(&builtin_profiles()), base);
+        let mut changed = profiles.clone();
+        changed[0].doc_type = Some("Outro".to_string());
+        assert_ne!(profiles_fingerprint(&changed), base);
+        assert_ne!(profiles_fingerprint(&[]), base);
+    }
 
     #[test]
     fn builtin_profile_is_valid() {

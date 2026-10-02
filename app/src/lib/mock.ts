@@ -1007,6 +1007,39 @@ function saveUserProfiles(list: Profile[]) {
 
 let userProfiles: Profile[] = []
 
+// Results kept between runs, like the backend's <data folder>/cache/results.json: valid only for
+// the profiles they were read with.
+interface ResultCache {
+  key: string
+  results: Record<string, DocResult>
+}
+let resultCache: ResultCache | null = null
+let resultCacheDir = ''
+let resultCacheDirty = false
+
+const resultsKey = (dir: string) => `${dirPrefix(dir)}mock.results`
+const resultCacheKey = (profiles: Profile[]) => `mock-1:${JSON.stringify(profiles)}`
+
+/** The cache of the data folder in use, emptied when `key` differs from the one it was read with. */
+function results(key: string): ResultCache {
+  const dir = currentDataDir()
+  if (!resultCache || resultCacheDir !== dir) {
+    resultCache = null
+    resultCacheDir = dir
+    try {
+      const raw: unknown = JSON.parse(window.localStorage.getItem(resultsKey(dir)) ?? 'null')
+      if (raw && typeof raw === 'object') resultCache = raw as ResultCache
+    } catch {
+      // A corrupt cache is an empty one.
+    }
+  }
+  if (!resultCache || resultCache.key !== key) {
+    resultCache = { key, results: {} }
+    resultCacheDirty = true
+  }
+  return resultCache
+}
+
 /** Deep copy through JSON, like Tauri's IPC does (also works on Svelte state proxies). */
 function ipcClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
@@ -1027,8 +1060,8 @@ function profileMatches(profile: Profile, doc: MockDoc): boolean {
  * Type and kind: the user's profiles first (so a rule can say "the DANFSe of my accountant is an
  * expense"), then the built-in one; the type defaults to the layout's.
  */
-function classify(doc: MockDoc): { docType: string; kind: DocKind } {
-  const matching = [...userProfiles, BUILTIN_PROFILE].filter((p) => profileMatches(p, doc))
+function classify(doc: MockDoc, profiles: Profile[]): { docType: string; kind: DocKind } {
+  const matching = [...profiles, BUILTIN_PROFILE].filter((p) => profileMatches(p, doc))
   const docType = matching.find((p) => p.docType)?.docType ?? doc.docType
   const kind = matching.find((p) => p.kind)?.kind ?? 'revenue'
   return { docType, kind }
@@ -1039,7 +1072,7 @@ function classify(doc: MockDoc): { docType: string; kind: DocKind } {
 const CORRUPT = 'O arquivo não é um PDF válido ou está corrompido.'
 const MISSING = 'Arquivo não encontrado.'
 
-function extractOne(path: string): DocResult {
+function extractOne(path: string, profiles: Profile[] = userProfiles): DocResult {
   const doc = getDoc(path)
   const base = {
     path,
@@ -1051,7 +1084,7 @@ function extractOne(path: string): DocResult {
   }
   if (!doc) return { ...base, status: 'error', message: MISSING }
   if (!doc.pages) return { ...base, status: 'error', message: CORRUPT }
-  Object.assign(base, classify(doc))
+  Object.assign(base, classify(doc, profiles))
   if (!doc.pages.some((p) => p.items.length > 0)) {
     return { ...base, status: 'noText', message: 'Nenhuma página tem texto extraível (provavelmente é uma imagem digitalizada).' }
   }
@@ -1065,7 +1098,7 @@ function extractOne(path: string): DocResult {
   if (doc.found) {
     return { ...base, status: 'ok', fields: { net_value: fieldValue(doc.found.item, doc.found.page, doc.found.origin), ...optional } }
   }
-  for (const profile of userProfiles) {
+  for (const profile of profiles) {
     if (!profileMatches(profile, doc)) continue
     for (const rule of profile.fields.net_value ?? []) {
       const hit = evalRule(doc, rule)
@@ -1203,12 +1236,12 @@ export interface MockControls {
   /** Every `tax_report` input received. */
   taxInputs: TaxInput[]
   /** Calls seen by the backend: scans, and the store documents read (in order). */
-  log: { scans: number; reads: string[] }
+  log: { scans: number; reads: string[]; extracted: number }
 }
 
 const exportLog: ExportRequest[] = []
 const taxLog: TaxInput[] = []
-const callLog = { scans: 0, reads: [] as string[] }
+const callLog = { scans: 0, reads: [] as string[], extracted: 0 }
 
 const STORE_NAME = /^[a-z0-9-]{1,40}$/
 const STORE_MAX_BYTES = 2 * 1024 * 1024
@@ -1380,17 +1413,43 @@ export function createMockBackend(): Backend {
       return { sources: infos, files, excluded: [...excluded].sort() }
     },
 
-    async extractDocuments(paths: string[]): Promise<DocResult[]> {
+    async cachedResults(keys: string[]): Promise<Record<string, DocResult>> {
+      await sleep(jitter(15, 10))
+      const cache = results(resultCacheKey(userProfiles))
+      return ipcClone(Object.fromEntries(keys.filter((k) => cache.results[k]).map((k) => [k, cache.results[k]])))
+    },
+
+    async extractDocuments(paths: string[], keys: string[]): Promise<DocResult[]> {
+      if (keys.length !== paths.length) throw 'Erro interno: uma chave por arquivo.'
+      // Like the backend: the profiles of the whole call are the ones in use when it starts.
+      const profiles = userProfiles
       const out: DocResult[] = []
       // The large folder is read fast (it exists to measure the table, not the reading).
       const fast = paths.length > 0 && paths.every((p) => p.startsWith(`${MOCK_FOLDERS.large}/`))
       if (fast) await sleep(2)
       for (let i = 0; i < paths.length; i++) {
         if (!fast) await sleep(jitter(35, 40))
-        out.push(extractOne(paths[i]))
+        out.push(extractOne(paths[i], profiles))
+        callLog.extracted++
         emit('extract-progress', { done: i + 1, total: paths.length })
       }
+      const cache = results(resultCacheKey(profiles))
+      out.forEach((doc, i) => {
+        if (!keys[i] || doc.status === 'error') return
+        cache.results[keys[i]] = { ...ipcClone(doc), path: '' }
+        resultCacheDirty = true
+      })
       return out
+    },
+
+    async saveCachedResults(): Promise<void> {
+      if (!resultCacheDirty || !resultCache) return
+      resultCacheDirty = false
+      try {
+        window.localStorage.setItem(resultsKey(resultCacheDir), JSON.stringify(resultCache))
+      } catch {
+        // Ignore: the demo reads the files again next time.
+      }
     },
 
     async renderPage(path: string, page: number, _width: number): Promise<RenderedPage> {
