@@ -1249,7 +1249,7 @@ const unreadable = new Set<string>()
 let activeTestRun = 0
 
 const STORE_NAME = /^[a-z0-9-]{1,40}$/
-const STORE_MAX_BYTES = 2 * 1024 * 1024
+const STORE_MAX_BYTES = 8 * 1024 * 1024
 
 const PDFIUM_FLAG = 'nfsetable.mock.pdfiumMissing'
 
@@ -1601,7 +1601,7 @@ export function createMockBackend(): Backend {
     async writeStore(name: string, value: unknown): Promise<void> {
       if (!STORE_NAME.test(name)) throw `Nome de armazenamento inválido: "${name}".`
       const json = JSON.stringify(value)
-      if (json.length > STORE_MAX_BYTES) throw 'Os dados passam do limite de 2 MB.'
+      if (new TextEncoder().encode(json).length > STORE_MAX_BYTES) throw 'Os dados são grandes demais para salvar.'
       try {
         window.localStorage.setItem(storeKey(currentDataDir(), name), json)
       } catch {

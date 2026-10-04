@@ -6,8 +6,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 const MAX_NAME_LEN: usize = 40;
-/// Guard against runaway writes; the planning document is a few kilobytes.
-const MAX_BYTES: usize = 2 * 1024 * 1024;
+/// Guard against runaway writes. The notes document grows with the user's edits (about 190 bytes
+/// per value read from a region), so this still leaves room for tens of thousands of them.
+const MAX_BYTES: usize = 8 * 1024 * 1024;
 
 /// Reads a stored document; `None` when it was never written. A corrupt file is reported, not
 /// silently replaced, so the user does not lose what they typed.
@@ -26,10 +27,11 @@ pub fn read(dir: &Path, name: &str) -> Result<Option<serde_json::Value>, String>
     })
 }
 
-/// Writes a document atomically (temporary file, then rename).
+/// Writes a document atomically (temporary file, then rename), as compact JSON: the limit applies
+/// to the bytes written.
 pub fn write(dir: &Path, name: &str, value: &serde_json::Value) -> Result<(), String> {
     let path = file_of(dir, name)?;
-    let json = serde_json::to_string_pretty(value).map_err(|e| e.to_string())?;
+    let json = serde_json::to_string(value).map_err(|e| e.to_string())?;
     if json.len() > MAX_BYTES {
         return Err("Os dados são grandes demais para salvar.".to_string());
     }
@@ -80,6 +82,22 @@ mod tests {
         }
         let huge = json!("x".repeat(MAX_BYTES + 1));
         assert!(write(dir.path(), "planning", &huge).is_err());
+    }
+
+    #[test]
+    fn writes_compact_json_up_to_the_limit() {
+        let dir = tempfile::tempdir().unwrap();
+        let doc = json!({ "overrides": { "abc": { "cents": 1, "origin": "region" } } });
+        write(dir.path(), "notes-acme", &doc).unwrap();
+        let text = fs::read_to_string(dir.path().join("notes-acme.json")).unwrap();
+        assert_eq!(
+            text,
+            r#"{"overrides":{"abc":{"cents":1,"origin":"region"}}}"#
+        );
+        // Exactly at the limit (two quotes around the text): saved.
+        let at_limit = json!("x".repeat(MAX_BYTES - 2));
+        write(dir.path(), "notes-acme", &at_limit).unwrap();
+        assert_eq!(read(dir.path(), "notes-acme").unwrap(), Some(at_limit));
     }
 
     #[test]
