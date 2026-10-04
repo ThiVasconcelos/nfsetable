@@ -4,14 +4,15 @@
 
 use regex::Regex;
 use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock, PoisonError};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
 /// Patterns kept at most; the cache starts over when it is full (a run uses a handful).
 const CAPACITY: usize = 256;
 
-/// The compiled `pattern`, reused when it was compiled before. Cloning a `Regex` is cheap.
-pub(crate) fn compiled(pattern: &str) -> Result<Regex, regex::Error> {
-    static CACHE: OnceLock<Mutex<HashMap<String, Regex>>> = OnceLock::new();
+/// The compiled `pattern`, reused when it was compiled before. Shared (not cloned): a cloned
+/// `Regex` starts with empty search caches, a shared one keeps them warm from file to file.
+pub(crate) fn compiled(pattern: &str) -> Result<Arc<Regex>, regex::Error> {
+    static CACHE: OnceLock<Mutex<HashMap<String, Arc<Regex>>>> = OnceLock::new();
     let cache = CACHE.get_or_init(Default::default);
     if let Some(found) = cache
         .lock()
@@ -20,7 +21,7 @@ pub(crate) fn compiled(pattern: &str) -> Result<Regex, regex::Error> {
     {
         return Ok(found.clone());
     }
-    let regex = Regex::new(pattern)?;
+    let regex = Arc::new(Regex::new(pattern)?);
     let mut map = cache.lock().unwrap_or_else(PoisonError::into_inner);
     if map.len() >= CAPACITY {
         map.clear();
@@ -37,7 +38,10 @@ mod tests {
     fn compiles_once_and_reports_errors() {
         let first = compiled(r"valor\s*liquido").unwrap();
         let again = compiled(r"valor\s*liquido").unwrap();
-        assert_eq!(first.as_str(), again.as_str());
+        assert!(
+            Arc::ptr_eq(&first, &again),
+            "the same compiled regex is shared"
+        );
         assert!(again.is_match("valor liquido"));
         assert!(compiled("(sem fechar").is_err());
     }

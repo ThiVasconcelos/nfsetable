@@ -18,7 +18,7 @@ use pdfium_render::prelude::PdfPageIndex;
 use regex::Regex;
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 /// Pages searched per document.
 const MAX_PAGES: u32 = 5;
@@ -315,7 +315,7 @@ fn apply_rule(pages: &[(u32, PageText)], rule: &Rule, kind: FieldKind) -> Option
                     page,
                     kind,
                     &pattern,
-                    exclude.as_ref(),
+                    exclude.as_deref(),
                     *direction,
                     *max_distance,
                 )
@@ -711,7 +711,7 @@ fn anchor_text(norm: &str) -> Option<String> {
 }
 
 /// Literal search for an anchor text that also matches glued or differently spaced words.
-fn anchor_regex(text: &str) -> Option<Regex> {
+fn anchor_regex(text: &str) -> Option<Arc<Regex>> {
     let words: Vec<String> = text.split_whitespace().map(regex::escape).collect();
     if words.is_empty() {
         return None;
