@@ -1236,14 +1236,14 @@ export interface MockControls {
   /** Every `tax_report` input received. */
   taxInputs: TaxInput[]
   /** Calls seen by the backend: scans, and the store documents read (in order). */
-  log: { scans: number; reads: string[]; extracted: number }
+  log: { scans: number; reads: string[]; extracted: number; renders: number }
   /** Paths the scan cannot read (empty hash, like a file locked by another program). */
   unreadable: Set<string>
 }
 
 const exportLog: ExportRequest[] = []
 const taxLog: TaxInput[] = []
-const callLog = { scans: 0, reads: [] as string[], extracted: 0 }
+const callLog = { scans: 0, reads: [] as string[], extracted: 0, renders: 0 }
 const unreadable = new Set<string>()
 
 const STORE_NAME = /^[a-z0-9-]{1,40}$/
@@ -1457,6 +1457,7 @@ export function createMockBackend(): Backend {
     },
 
     async renderPage(path: string, page: number, _width: number): Promise<RenderedPage> {
+      callLog.renders++
       await sleep(jitter(90, 80))
       const doc = getDoc(path)
       if (!doc) throw MISSING

@@ -10,6 +10,15 @@
     cache.set(key, page)
     while (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value as string)
   }
+
+  // The preview is rebuilt for every row the keyboard passes over. A request that comes soon after
+  // the previous one waits a moment, so only the row the user stops on is rendered; one that comes
+  // after a pause (a click) is sent right away.
+  const SETTLE_MS = 200
+  const BURST_GAP_MS = 300
+  let lastRequestAt = -Infinity
+  /** Newest render request of any preview: older answers are dropped, not shown or cached. */
+  let latest = 0
 </script>
 
 <script lang="ts">
@@ -44,8 +53,8 @@
   let drawnEl: HTMLDivElement | undefined = $state()
   let layer: HTMLDivElement | undefined = $state()
   let drag = $state<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
-  let seq = 0
 
+  const measured = $derived(viewportWidth > 0)
   const pageWidth = $derived(Math.max(120, (viewportWidth - PADDING * 2) * zoom))
 
   // Pixel width requested from the backend: bucketed so small resizes do not re-render.
@@ -55,35 +64,43 @@
     return Math.min(3072, Math.max(512, Math.ceil(px / 256) * 256))
   })
 
+  // Depends on the bucketed width only: a few pixels of scrollbar do not render the page again.
   $effect(() => {
-    if (viewportWidth <= 0) return
-    void load(path, page, targetWidth)
-  })
-
-  async function load(p: string, pg: number, width: number) {
-    const key = `${p}|${pg}|${width}`
-    const hit = cache.get(key)
+    if (!measured) return
+    const [p, pg, width] = [path, page, targetWidth]
+    const mine = ++latest
+    const hit = cache.get(`${p}|${pg}|${width}`)
     if (hit) {
-      rendered = hit
-      error = null
-      onrendered?.(hit)
+      loading = false
+      show(hit)
       return
     }
-    const mySeq = ++seq
+    const now = performance.now()
+    const delay = now - lastRequestAt < BURST_GAP_MS ? SETTLE_MS : 0
+    lastRequestAt = now
     loading = true
+    const timer = setTimeout(() => void load(p, pg, width, mine), delay)
+    return () => clearTimeout(timer)
+  })
+
+  function show(page: RenderedPage) {
+    rendered = page
+    error = null
+    onrendered?.(page)
+  }
+
+  async function load(p: string, pg: number, width: number, mine: number) {
     try {
       const result = await renderPage(p, pg, width)
-      if (mySeq !== seq) return
-      remember(key, result)
-      rendered = result
-      error = null
-      onrendered?.(result)
+      if (mine !== latest) return
+      remember(`${p}|${pg}|${width}`, result)
+      show(result)
     } catch (e) {
-      if (mySeq !== seq) return
+      if (mine !== latest) return
       rendered = null
       error = errorMessage(e)
     } finally {
-      if (mySeq === seq) loading = false
+      if (mine === latest) loading = false
     }
   }
 
