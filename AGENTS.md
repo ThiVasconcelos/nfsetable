@@ -173,7 +173,7 @@ normalization exists once in Rust and once in TS.
 | amounts by month, costs of a month | `tax::revenue::sum_by_month`, `revenue::annualize`, `Input::costs_in` | — |
 | Fator R and annex | `tax::simples::fs12`, `simples::fator_r_and_annex`, `Das::outside_iss`, `tax::mei::it_blocked` | — |
 | rounding in the tax engine | `tax::money` (`round_money`, `ceil_money`, `trunc2`, `to_cents`, `from_cents`, `percent`) | — |
-| file name patterns (`*`, `?`) | `profile::name_matches` (native glob, no regex) | `namePatternMatches`, `nameMatches` (`rules.ts`) |
+| file name patterns (`*`, `?`) | `profile::name_matches` (native glob, no regex) | `compileNamePatterns` (compile once, test many), `nameMatches` (`rules.ts`) |
 | regex that comes from data (profile rules) | `regex_cache::compiled` | — |
 | file names and paths | `scan::file_name` | `pathKey`, `baseName`, `fileStem`, `shortenPath` |
 | plurals and labels | `text::count_label` | `plural` (`format.ts`), `labels.ts` |
@@ -199,7 +199,7 @@ patterns nobody can review.
      of the text unless `(?m)` is on).
    - TS: a module-level `const NAME_RE = /…/` with the same comment line, named groups
      `(?<name>…)`, `^…$` for a whole string, the `u` flag for non-ASCII text, and never
-     `new RegExp(text)` from user input without escaping it (see `namePatternMatches`).
+     `new RegExp(text)` from user input without escaping it (see `compileNamePatterns`).
 3. **The engines differ.** The Rust `regex` crate runs in linear time (no ReDoS, which is why the
    patterns users save in profiles are safe) but has no lookaround or backreferences, which is why
    anchor rules carry an `excludeSuffix`. JavaScript's `RegExp` backtracks: no ambiguous nested

@@ -5,27 +5,35 @@ import { fileStem, normalizeText } from './format'
 import type { Profile } from './types'
 
 /**
- * True when `pattern` matches the file name: case- and accent-insensitive; `*` is any run of
- * characters and `?` one character (the whole name must match); a pattern without wildcards
- * matches anywhere in the name.
+ * Compiles file name patterns into a test of NORMALIZED names (`normalizeText`, e.g. a row's
+ * `searchKey`): case- and accent-insensitive; `*` is any run of characters and `?` one character
+ * (the whole name must match); a pattern without wildcards matches anywhere in the name. True when
+ * at least one pattern matches, or when there is no pattern (any file). Compile once, then test
+ * many names.
  */
-export function namePatternMatches(pattern: string, fileName: string): boolean {
+export function compileNamePatterns(patterns: readonly string[]): (nameKey: string) => boolean {
+  if (!patterns.length) return () => true
+  const tests = patterns.map(compilePattern)
+  return (nameKey) => tests.some((test) => test(nameKey))
+}
+
+function compilePattern(pattern: string): (nameKey: string) => boolean {
   const p = normalizeText(pattern)
-  if (!p) return false
-  const name = normalizeText(fileName)
-  if (!p.includes('*') && !p.includes('?')) return name.includes(p)
+  if (!p) return () => false
+  if (!p.includes('*') && !p.includes('?')) return (name) => name.includes(p)
   let source = '^'
   for (const c of p) {
     if (c === '*') source += '.*'
     else if (c === '?') source += '.'
     else source += c.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')
   }
-  return new RegExp(`${source}$`, 'u').test(name)
+  const re = new RegExp(`${source}$`, 'u')
+  return (name) => re.test(name)
 }
 
-/** True when at least one pattern matches, or when there is no pattern (any file). */
+/** One file name against `patterns` (see compileNamePatterns). */
 export function nameMatches(patterns: readonly string[], fileName: string): boolean {
-  return !patterns.length || patterns.some((p) => namePatternMatches(p, fileName))
+  return compileNamePatterns(patterns)(normalizeText(fileName))
 }
 
 /** The profile classifies documents (sets a type or a kind). */

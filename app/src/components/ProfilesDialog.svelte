@@ -7,7 +7,7 @@
   import { errorMessage } from '../lib/api'
   import { formatInt, normalizeText, plural } from '../lib/format'
   import { describeRule } from '../lib/labels'
-  import { classifies, hasValueRules, nameMatches } from '../lib/rules'
+  import { classifies, compileNamePatterns, hasValueRules } from '../lib/rules'
   import { KIND_LABEL, store, type RuleSeed } from '../lib/store.svelte'
   import type { DocKind, Profile } from '../lib/types'
   import ChipsInput from './ChipsInput.svelte'
@@ -98,8 +98,12 @@
   const allPatterns = $derived([...patterns, patternDraft.trim()].filter(Boolean))
   const allTexts = $derived([...texts, textDraft.trim()].filter(Boolean))
   const valueRules = $derived(editing ? (editing.fields.net_value ?? []) : [])
-  /** Files of the table whose name matches the patterns being typed. */
-  const matches = $derived(allPatterns.length ? store.rows.filter((r) => nameMatches(allPatterns, r.name)) : [])
+  /** Files of the table whose name matches the patterns being typed (compiled once per change). */
+  const matches = $derived.by(() => {
+    if (!allPatterns.length) return []
+    const matchName = compileNamePatterns(allPatterns)
+    return store.rows.filter((r) => matchName(r.searchKey))
+  })
   const typeSuggestions = $derived.by(() => {
     const q = normalizeText(docType)
     const all = [...new Set([...EXPENSE_TYPES, ...store.knownTypes])].filter((t) => !['cancelada'].includes(normalizeText(t)))
