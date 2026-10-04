@@ -48,7 +48,8 @@ export interface Backend {
   saveCachedResults(): Promise<void>
   renderPage(path: string, page: number, width: number): Promise<RenderedPage>
   readRegion(path: string, page: number, rect: Rect): Promise<RegionRead>
-  testRule(paths: string[], rule: Rule): Promise<RuleTest[]>
+  testRule(paths: string[], rule: Rule, run: number): Promise<RuleTest[]>
+  cancelTest(run: number): Promise<void>
   listProfiles(): Promise<Profile[]>
   saveProfile(profile: Profile): Promise<Profile>
   deleteProfile(id: string): Promise<void>
@@ -90,7 +91,8 @@ const tauriBackend: Backend = {
   saveCachedResults: () => invoke<void>('save_cached_results'),
   renderPage: (path, page, width) => invoke<RenderedPage>('render_page', { path, page, width }),
   readRegion: (path, page, rect) => invoke<RegionRead>('read_region', { path, page, rect }),
-  testRule: (paths, rule) => invoke<RuleTest[]>('test_rule', { paths, rule }),
+  testRule: (paths, rule, run) => invoke<RuleTest[]>('test_rule', { paths, rule, run }),
+  cancelTest: (run) => invoke<void>('cancel_test', { run }),
   listProfiles: () => invoke<Profile[]>('list_profiles'),
   saveProfile: (profile) => invoke<Profile>('save_profile', { profile }),
   deleteProfile: (id) => invoke<void>('delete_profile', { id }),
@@ -204,9 +206,15 @@ export const renderPage = async (path: string, page: number, width: number): Pro
 export const readRegion = async (path: string, page: number, rect: Rect): Promise<RegionRead> =>
   (await backend()).readRegion(path, page, rect)
 
-/** `test_rule(paths, rule)`; emits "test-progress". */
-export const testRule = async (paths: string[], rule: Rule): Promise<RuleTest[]> =>
-  (await backend()).testRule(paths, rule)
+/**
+ * `test_rule(paths, rule, run)`: tests a rule as test number `run`; emits "test-progress" tagged
+ * with it. Starting a test stops the previous one.
+ */
+export const testRule = async (paths: string[], rule: Rule, run: number): Promise<RuleTest[]> =>
+  (await backend()).testRule(paths, rule, run)
+
+/** `cancel_test(run)`: stops test `run` before its next file. */
+export const cancelTest = async (run: number): Promise<void> => (await backend()).cancelTest(run)
 
 /** `list_profiles()`: built-ins first, then user profiles by name. */
 export const listProfiles = async (): Promise<Profile[]> => (await backend()).listProfiles()

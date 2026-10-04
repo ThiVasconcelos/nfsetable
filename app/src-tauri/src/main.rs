@@ -44,6 +44,7 @@ fn main() {
             commands::render_page,
             commands::read_region,
             commands::test_rule,
+            commands::cancel_test,
             commands::list_profiles,
             commands::save_profile,
             commands::delete_profile,

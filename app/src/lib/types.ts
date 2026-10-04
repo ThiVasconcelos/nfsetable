@@ -292,6 +292,8 @@ export interface AppInfo {
 export interface Progress {
   done: number
   total: number
+  /** Rule test the progress belongs to (`test-progress`); 0 for the extraction. */
+  run: number
 }
 
 // ---------------------------------------------------------------- taxes

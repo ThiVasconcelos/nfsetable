@@ -386,6 +386,9 @@ pub struct AppInfo {
 pub struct Progress {
     pub done: u32,
     pub total: u32,
+    /// Rule test the progress belongs to (`test-progress`); 0 for the extraction.
+    #[serde(default)]
+    pub run: u32,
 }
 
 // ---------------------------------------------------------------- taxes

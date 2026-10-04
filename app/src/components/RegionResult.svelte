@@ -16,7 +16,7 @@
     read && read.suggestedRule.type === 'region' && read.suggestedRule.anchor ? read.suggestedRule.anchor.text : null,
   )
   const fixable = $derived(store.fixableRows.length)
-  const all = $derived(store.rows.length)
+  const all = $derived(store.testableRows.length)
   const isCurrentValue = $derived(
     value?.cents != null && store.activeRow?.cents === value.cents && store.activeRow?.path === region.path,
   )

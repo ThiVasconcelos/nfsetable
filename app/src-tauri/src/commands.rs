@@ -11,6 +11,7 @@ use nfsetable_core::{
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock};
 use tauri::{AppHandle, Emitter, State};
 
@@ -30,6 +31,8 @@ pub struct AppState {
     results: Arc<Mutex<ResultCache>>,
     /// Held while the results are written, so writes land one at a time and in order.
     results_writer: Arc<Mutex<()>>,
+    /// The rule test allowed to go on (0: none); a newer test or `cancel_test` stops the others.
+    test_run: Arc<AtomicU32>,
 }
 
 impl AppState {
@@ -39,6 +42,7 @@ impl AppState {
             engine: engine.map(Arc::new),
             results: Arc::new(Mutex::new(ResultCache::load(&data_dir))),
             results_writer: Arc::new(Mutex::new(())),
+            test_run: Arc::new(AtomicU32::new(0)),
             default_dir,
             data_dir: RwLock::new(data_dir),
             data_dir_error: RwLock::new(data_dir_error),
@@ -123,24 +127,27 @@ fn set_lock<T>(lock: &RwLock<T>, value: T) {
     *lock.write().unwrap_or_else(PoisonError::into_inner) = value;
 }
 
-/// Runs `work` on every path, in order, emitting `event` with the progress after each one.
+/// Runs `work` on every path, in order, emitting `event` with the progress (tagged with `run`)
+/// after each one. Stops before the next path once `stopped()` is true.
 fn map_with_progress<T>(
     app: &AppHandle,
     event: &str,
     paths: &[String],
+    run: u32,
+    stopped: impl Fn() -> bool,
     mut work: impl FnMut(&Path) -> T,
 ) -> Vec<T> {
     let total = u32::try_from(paths.len()).unwrap_or(u32::MAX);
-    paths
-        .iter()
-        .enumerate()
-        .map(|(i, path)| {
-            let result = work(Path::new(path));
-            let done = u32::try_from(i + 1).unwrap_or(u32::MAX);
-            let _ = app.emit(event, Progress { done, total });
-            result
-        })
-        .collect()
+    let mut results = Vec::with_capacity(paths.len());
+    for (i, path) in paths.iter().enumerate() {
+        if stopped() {
+            break;
+        }
+        results.push(work(Path::new(path)));
+        let done = u32::try_from(i + 1).unwrap_or(u32::MAX);
+        let _ = app.emit(event, Progress { done, total, run });
+    }
+    results
 }
 
 /// Runs blocking work off the async runtime.
@@ -224,9 +231,14 @@ pub async fn extract_documents(
     let key = results::key(&profiles);
     let fields = builtin_fields();
     let docs = blocking(move || {
-        map_with_progress(&app, EXTRACT_PROGRESS, &paths, |path| {
-            engine.extract(path, &profiles, &fields)
-        })
+        map_with_progress(
+            &app,
+            EXTRACT_PROGRESS,
+            &paths,
+            0,
+            || false,
+            |path| engine.extract(path, &profiles, &fields),
+        )
     })
     .await?;
     let due = {
@@ -276,22 +288,36 @@ pub async fn read_region(
         .map_err(|e| e.to_string())
 }
 
+/// Tests `rule` on `paths` as test number `run` (from the UI). Starting a test stops the one
+/// before it; `cancel_test` stops this one. A stopped test returns what it read so far.
 #[tauri::command]
 pub async fn test_rule(
     app: AppHandle,
     state: State<'_, AppState>,
     paths: Vec<String>,
     rule: Rule,
+    run: u32,
 ) -> Result<Vec<RuleTest>, String> {
     let engine = state.engine()?;
     nfsetable_core::profile::validate_rule(&rule).map_err(|e| e.to_string())?;
     let field = net_value_field();
+    let active = state.test_run.clone();
+    active.store(run, Ordering::SeqCst);
     blocking(move || {
-        map_with_progress(&app, TEST_PROGRESS, &paths, |path| {
+        let stopped = || active.load(Ordering::SeqCst) != run;
+        map_with_progress(&app, TEST_PROGRESS, &paths, run, stopped, |path| {
             engine.test_rule(path, &field, &rule)
         })
     })
     .await
+}
+
+/// Stops rule test `run` before its next file ("Cancelar"); a newer test is not affected.
+#[tauri::command]
+pub fn cancel_test(state: State<'_, AppState>, run: u32) {
+    let _ = state
+        .test_run
+        .compare_exchange(run, 0, Ordering::SeqCst, Ordering::SeqCst);
 }
 
 #[tauri::command]

@@ -1236,15 +1236,17 @@ export interface MockControls {
   /** Every `tax_report` input received. */
   taxInputs: TaxInput[]
   /** Calls seen by the backend: scans, and the store documents read (in order). */
-  log: { scans: number; reads: string[]; extracted: number; renders: number }
+  log: { scans: number; reads: string[]; extracted: number; renders: number; tested: number }
   /** Paths the scan cannot read (empty hash, like a file locked by another program). */
   unreadable: Set<string>
 }
 
 const exportLog: ExportRequest[] = []
 const taxLog: TaxInput[] = []
-const callLog = { scans: 0, reads: [] as string[], extracted: 0, renders: 0 }
+const callLog = { scans: 0, reads: [] as string[], extracted: 0, renders: 0, tested: 0 }
 const unreadable = new Set<string>()
+/** The rule test allowed to go on (0: none), like the backend's. */
+let activeTestRun = 0
 
 const STORE_NAME = /^[a-z0-9-]{1,40}$/
 const STORE_MAX_BYTES = 2 * 1024 * 1024
@@ -1435,7 +1437,7 @@ export function createMockBackend(): Backend {
         if (!fast) await sleep(jitter(35, 40))
         out.push(extractOne(paths[i], profiles))
         callLog.extracted++
-        emit('extract-progress', { done: i + 1, total: paths.length })
+        emit('extract-progress', { done: i + 1, total: paths.length, run: 0 })
       }
       const cache = results(resultCacheKey(profiles))
       out.forEach((doc, i) => {
@@ -1494,10 +1496,13 @@ export function createMockBackend(): Backend {
       }
     },
 
-    async testRule(paths: string[], rule: Rule): Promise<RuleTest[]> {
+    async testRule(paths: string[], rule: Rule, run: number): Promise<RuleTest[]> {
+      activeTestRun = run
       const out: RuleTest[] = []
       for (let i = 0; i < paths.length; i++) {
         await sleep(jitter(45, 45))
+        if (activeTestRun !== run) break
+        callLog.tested++
         const path = paths[i]
         const doc = getDoc(path)
         if (!doc) out.push({ path, value: null, error: MISSING })
@@ -1506,9 +1511,13 @@ export function createMockBackend(): Backend {
           const hit = evalRule(doc, rule)
           out.push({ path, value: hit ? fieldValue(hit.item, hit.page, { type: 'region' }) : null, error: null })
         }
-        emit('test-progress', { done: i + 1, total: paths.length })
+        emit('test-progress', { done: i + 1, total: paths.length, run })
       }
       return out
+    },
+
+    async cancelTest(run: number): Promise<void> {
+      if (activeTestRun === run) activeTestRun = 0
     },
 
     async listProfiles(): Promise<Profile[]> {

@@ -437,7 +437,7 @@ export class AppStore {
   scan = $state.raw<ScanResult | null>(null)
   results = $state.raw<Record<string, DocResult>>({})
   phase = $state<'idle' | 'scanning' | 'extracting'>('idle')
-  progress = $state<Progress>({ done: 0, total: 0 })
+  progress = $state<Progress>({ done: 0, total: 0, run: 0 })
 
   // Page
   view = $state<View>('notes')
@@ -626,6 +626,9 @@ export class AppStore {
     this.rows.filter((r) => r.extractionStatus === 'notFound' && r.cents == null && !r.duplicateOf),
   )
 
+  /** Rows of "Testar em todas": every file once (a duplicate would give the same answer). */
+  testableRows = $derived.by(() => this.rows.filter((r) => !r.duplicateOf))
+
   removedCount = $derived.by(
     () =>
       (this.scan?.files ?? []).filter(
@@ -664,12 +667,13 @@ export class AppStore {
     await safely(() =>
       api.onExtractProgress((p) => {
         if (this.phase !== 'extracting') return
-        this.progress = { done: Math.min(this.progress.total, this.#chunkBase + p.done), total: this.progress.total }
+        this.progress = { done: Math.min(this.progress.total, this.#chunkBase + p.done), total: this.progress.total, run: 0 }
       }),
     )
     await safely(() =>
       api.onTestProgress((p) => {
-        if (this.ruleTest?.running) this.ruleTest.progress = { done: p.done, total: p.total }
+        const test = this.ruleTest
+        if (test?.running && p.run === test.seq) test.progress = { done: p.done, total: p.total, run: p.run }
       }),
     )
     await safely(() => api.onDragDrop((s) => this.#onDragDrop(s)))
@@ -901,7 +905,7 @@ export class AppStore {
     if (!todo.length) return
 
     this.phase = 'extracting'
-    this.progress = { done: 0, total: todo.length }
+    this.progress = { done: 0, total: todo.length, run: 0 }
     const fileByPath = new Map(scan.files.map((f) => [f.path, f]))
     for (let i = 0; i < todo.length; i += CHUNK_SIZE) {
       if (this.#dirty) return
@@ -936,7 +940,7 @@ export class AppStore {
       })
       fillDuplicates(scan.files, next)
       this.results = next
-      this.progress = { done: Math.min(todo.length, i + chunk.length), total: todo.length }
+      this.progress = { done: Math.min(todo.length, i + chunk.length), total: todo.length, run: 0 }
     }
     // Next time the app opens, these files are not read again.
     void api.saveCachedResults().catch(() => {})
@@ -1356,7 +1360,7 @@ export class AppStore {
     const region = this.region
     const read = region?.read
     if (!region || !read) return
-    const rows = scope === 'attention' ? this.fixableRows : this.rows
+    const rows = scope === 'attention' ? this.fixableRows : this.testableRows
     const paths = rows.map((r) => r.path)
     const seq = ++this.#seq
     const rule = $state.snapshot(read.suggestedRule) as Rule
@@ -1367,13 +1371,13 @@ export class AppStore {
       sourcePath: region.path,
       paths,
       running: true,
-      progress: { done: 0, total: paths.length },
+      progress: { done: 0, total: paths.length, run: seq },
       results: [],
       error: null,
       saving: false,
     }
     try {
-      const results = await api.testRule(paths, rule)
+      const results = await api.testRule(paths, rule, seq)
       if (this.ruleTest?.seq !== seq) return
       this.ruleTest.results = results
     } catch (e) {
@@ -1384,7 +1388,10 @@ export class AppStore {
     }
   }
 
+  /** "Cancelar": closes the dialog and stops a test still running in the backend. */
   closeRuleTest() {
+    const test = this.ruleTest
+    if (test?.running) void api.cancelTest(test.seq).catch(() => {})
     this.ruleTest = null
   }
 
