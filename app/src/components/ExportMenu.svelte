@@ -2,6 +2,7 @@
   import { tick } from 'svelte'
   import { formatInt, plural } from '../lib/format'
   import { EXPORT_FORMATS, EXPORT_FORMAT_ORDER } from '../lib/labels'
+  import { dismissOnOutside, menuKeydown } from '../lib/popup'
   import { store } from '../lib/store.svelte'
   import type { ExportFormat } from '../lib/types'
   import Icon from './Icon.svelte'
@@ -67,41 +68,12 @@
   }
 
   function onMenuKeydown(event: KeyboardEvent) {
-    const items = [...(menu?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])]
-    const index = items.indexOf(document.activeElement as HTMLButtonElement)
-    if (event.key === 'ArrowDown') {
-      event.preventDefault()
-      items[(index + 1) % items.length]?.focus()
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      items[(index - 1 + items.length) % items.length]?.focus()
-    } else if (event.key === 'Home') {
-      event.preventDefault()
-      items[0]?.focus()
-    } else if (event.key === 'End') {
-      event.preventDefault()
-      items[items.length - 1]?.focus()
-    } else if (event.key === 'Escape') {
-      event.preventDefault()
-      close(true)
-    } else if (event.key === 'Tab') {
-      close(false)
-    }
+    menuKeydown(event, menu, close)
   }
 
   $effect(() => {
     if (!open) return
-    const onPointer = (e: PointerEvent) => {
-      const target = e.target as Node
-      if (!menu?.contains(target) && !button?.contains(target)) close(false)
-    }
-    const onResize = () => close(false)
-    document.addEventListener('pointerdown', onPointer, true)
-    window.addEventListener('resize', onResize)
-    return () => {
-      document.removeEventListener('pointerdown', onPointer, true)
-      window.removeEventListener('resize', onResize)
-    }
+    return dismissOnOutside(() => [menu, button], () => close(false))
   })
 </script>
 

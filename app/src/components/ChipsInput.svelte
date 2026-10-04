@@ -1,7 +1,7 @@
 <script lang="ts">
   // A list of short texts edited as chips: type and press Enter (or a comma) to add, Backspace on an
   // empty field removes the last one, × removes one.
-  import { normalizeText } from '../lib/format'
+  import { sameText } from '../lib/format'
   import Icon from './Icon.svelte'
 
   interface Props {
@@ -25,7 +25,7 @@
   function add(text: string) {
     const t = text.trim()
     draft = ''
-    if (!t || values.some((v) => normalizeText(v) === normalizeText(t))) return
+    if (!t || values.some((v) => sameText(v, t))) return
     onchange([...values, t])
   }
 

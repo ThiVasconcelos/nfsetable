@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte'
-  import { normalizeText, plural } from '../lib/format'
+  import { plural } from '../lib/format'
+  import { dismissOnOutside } from '../lib/popup'
   import { store, type Row } from '../lib/store.svelte'
   import Icon from './Icon.svelte'
 
@@ -23,11 +24,8 @@
   const uid = $props.id()
   const listId = `bulk-types-${uid}`
 
-  const suggestions = $derived.by(() => {
-    const q = normalizeText(draft)
-    return q ? store.knownTypes.filter((t) => normalizeText(t).includes(q)) : store.knownTypes
-  })
-  const isNew = $derived(!!draft.trim() && !store.knownTypes.some((t) => normalizeText(t) === normalizeText(draft)))
+  const suggestions = $derived(store.typeSuggestions(draft))
+  const isNew = $derived(store.isNewType(draft))
   /** Type shared by every selected row, if any (marked in the list). */
   const common = $derived(rows.length && rows.every((r) => r.docType === rows[0].docType) ? rows[0].docType : null)
 
@@ -79,17 +77,7 @@
 
   $effect(() => {
     if (!open) return
-    const onPointer = (e: PointerEvent) => {
-      const target = e.target as Node
-      if (!panel?.contains(target) && !button?.contains(target)) close(false)
-    }
-    const onResize = () => close(false)
-    document.addEventListener('pointerdown', onPointer, true)
-    window.addEventListener('resize', onResize)
-    return () => {
-      document.removeEventListener('pointerdown', onPointer, true)
-      window.removeEventListener('resize', onResize)
-    }
+    return dismissOnOutside(() => [panel, button], () => close(false))
   })
 </script>
 

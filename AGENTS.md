@@ -164,7 +164,7 @@ normalization exists once in Rust and once in TS.
 
 | Job | Rust (`crates/core/src`) | TypeScript (`app/src/lib`) |
 |---|---|---|
-| accent- and case-insensitive text | `text::normalize`, `text::compact`, `text::fold_char` | `normalizeText` (`format.ts`) |
+| accent- and case-insensitive text | `text::normalize`, `text::compact`, `text::fold_char` | `normalizeText`, `sameText` (`format.ts`) |
 | amounts in document text | `parse::find_money`, `parse::parse_money` | (the engine reads them) |
 | amounts typed by the user | — | `parseMoneyInput` |
 | format money | `parse::format_brl`, `parse::format_decimal`, `parse::format_decimal_with` (separator); `tax::money::brl` wraps `format_brl` for decimals | `formatBRL`, `formatAmount`, `formatBRLCompact`, `formatBRLPlain` |
@@ -177,6 +177,8 @@ normalization exists once in Rust and once in TS.
 | regex that comes from data (profile rules) | `regex_cache::compiled` | — |
 | file names and paths | `scan::file_name` | `pathKey`, `baseName`, `fileStem`, `shortenPath` |
 | plurals and labels | `text::count_label` | `plural` (`format.ts`), `labels.ts` |
+| popups: close on a press, scroll or resize elsewhere; menu arrow keys | — | `dismissOnOutside`, `menuKeydown` (`popup.ts`) |
+| type suggestions of the type editors | — | `store.typeSuggestions`, `store.isNewType` |
 | JSON files in the data folder (app) | `app/src-tauri/src/files.rs`: `slug_path`, `write_atomic`, `remove_if_exists` | — |
 | PDFium in tests, examples and debug builds | `dev_pdfium_dir()`; integration tests share `crates/core/tests/common` (`engine`, `fixture`) | — |
 

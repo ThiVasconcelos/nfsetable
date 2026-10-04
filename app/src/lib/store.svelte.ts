@@ -25,6 +25,7 @@ import {
   normalizeText,
   pathKey,
   plural,
+  sameText,
 } from './format'
 import { EXPORT_FORMATS, STATUS_LABEL, exportFileName, originLabel, type RowStatus } from './labels'
 import { StoreDoc } from './persist.svelte'
@@ -650,6 +651,18 @@ export class AppStore {
 
   activeRow = $derived.by(() => this.rows.find((r) => r.path === this.activePath) ?? null)
 
+  /** Known types matching what is typed: all of them while nothing (or `current`) is typed. */
+  typeSuggestions(draft: string, current?: string): string[] {
+    const q = normalizeText(draft)
+    if (!q || (current && q === normalizeText(current))) return this.knownTypes
+    return this.knownTypes.filter((t) => normalizeText(t).includes(q))
+  }
+
+  /** `draft` is a type nobody uses yet (choosing it creates it). */
+  isNewType(draft: string): boolean {
+    return !!draft.trim() && !this.knownTypes.some((t) => sameText(t, draft))
+  }
+
   /** Rows a region rule can fix: text found but no value ("Testar nas com erro"). */
   fixableRows = $derived.by(() =>
     this.rows.filter((r) => r.extractionStatus === 'notFound' && r.cents == null && !r.duplicateOf),
@@ -829,7 +842,7 @@ export class AppStore {
   addExclude(term: string): boolean {
     const t = term.trim()
     if (!t) return false
-    if (this.exclude.some((x) => normalizeText(x) === normalizeText(t))) return false
+    if (this.exclude.some((x) => sameText(x, t))) return false
     this.exclude = [...this.exclude, t]
     this.#sourcesChanged()
     return true

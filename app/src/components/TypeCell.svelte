@@ -1,6 +1,5 @@
 <script lang="ts">
   import { tick } from 'svelte'
-  import { normalizeText } from '../lib/format'
   import { store, type Row } from '../lib/store.svelte'
   import Icon from './Icon.svelte'
 
@@ -20,15 +19,9 @@
   const uid = $props.id()
   const listId = `types-${uid}`
 
-  const suggestions = $derived.by(() => {
-    const q = normalizeText(draft)
-    if (!q || q === normalizeText(row.docType)) return store.knownTypes
-    return store.knownTypes.filter((t) => normalizeText(t).includes(q))
-  })
-
-  const isNew = $derived(
-    !!draft.trim() && !store.knownTypes.some((t) => normalizeText(t) === normalizeText(draft)),
-  )
+  // The draft starts as the current type: all the types are offered until it changes.
+  const suggestions = $derived(store.typeSuggestions(draft, row.docType))
+  const isNew = $derived(store.isNewType(draft))
 
   async function start(event: MouseEvent) {
     event.stopPropagation()

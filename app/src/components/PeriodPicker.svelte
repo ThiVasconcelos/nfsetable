@@ -6,6 +6,7 @@
   import { plural } from '../lib/format'
   import { monthKeyOf } from '../lib/format'
   import { ALL_PERIOD, PERIOD_LABEL, periodLabel, periodRange, type Period, type PeriodPreset } from '../lib/period'
+  import { dismissOnOutside } from '../lib/popup'
   import Icon from './Icon.svelte'
   import MonthInput from './MonthInput.svelte'
 
@@ -69,17 +70,7 @@
 
   $effect(() => {
     if (!open) return
-    const onPointer = (e: PointerEvent) => {
-      const target = e.target as Node
-      if (!root?.contains(target)) close(false)
-    }
-    const onResize = () => close(false)
-    document.addEventListener('pointerdown', onPointer, true)
-    window.addEventListener('resize', onResize)
-    return () => {
-      document.removeEventListener('pointerdown', onPointer, true)
-      window.removeEventListener('resize', onResize)
-    }
+    return dismissOnOutside(() => [root], () => close(false))
   })
 </script>
 

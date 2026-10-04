@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte'
+  import { dismissOnOutside, menuKeydown } from '../lib/popup'
   import { store, type Row } from '../lib/store.svelte'
   import Icon from './Icon.svelte'
 
@@ -17,7 +18,6 @@
   let button: HTMLButtonElement | undefined = $state()
   let menu: HTMLDivElement | undefined = $state()
   let position = $state({ top: 0, left: 0 })
-  let openedAt = 0
 
   async function toggle(event: MouseEvent) {
     event.stopPropagation()
@@ -34,7 +34,6 @@
       left: Math.max(8, r.right - MENU_WIDTH),
     }
     open = true
-    openedAt = performance.now()
     await tick()
     menu?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus({ preventScroll: true })
   }
@@ -51,48 +50,12 @@
 
   function onMenuKeydown(event: KeyboardEvent) {
     event.stopPropagation()
-    const items = [...(menu?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])]
-    const index = items.indexOf(document.activeElement as HTMLButtonElement)
-    if (event.key === 'ArrowDown') {
-      event.preventDefault()
-      items[(index + 1) % items.length]?.focus({ preventScroll: true })
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      items[(index - 1 + items.length) % items.length]?.focus({ preventScroll: true })
-    } else if (event.key === 'Home') {
-      event.preventDefault()
-      items[0]?.focus({ preventScroll: true })
-    } else if (event.key === 'End') {
-      event.preventDefault()
-      items[items.length - 1]?.focus({ preventScroll: true })
-    } else if (event.key === 'Escape') {
-      event.preventDefault()
-      close(true)
-    } else if (event.key === 'Tab') {
-      close(false)
-    }
+    menuKeydown(event, menu, close)
   }
 
   $effect(() => {
     if (!open) return
-    const onPointer = (e: PointerEvent) => {
-      const target = e.target as Node
-      if (!menu?.contains(target) && !button?.contains(target)) close(false)
-    }
-    const onScroll = (e: Event) => {
-      // Ignore the scroll caused by bringing the row into view right before opening.
-      if (performance.now() - openedAt < 250) return
-      if (!(e.target instanceof Node && menu?.contains(e.target))) close(false)
-    }
-    const onResize = () => close(false)
-    document.addEventListener('pointerdown', onPointer, true)
-    document.addEventListener('scroll', onScroll, true)
-    window.addEventListener('resize', onResize)
-    return () => {
-      document.removeEventListener('pointerdown', onPointer, true)
-      document.removeEventListener('scroll', onScroll, true)
-      window.removeEventListener('resize', onResize)
-    }
+    return dismissOnOutside(() => [menu, button], () => close(false), { scroll: true })
   })
 </script>
 

@@ -280,6 +280,11 @@ export function normalizeText(text: string): string {
   return collapseSpaces(text.normalize('NFD').replace(MARKS_RE, '').toLowerCase())
 }
 
+/** The same text ignoring case, accents and spacing; empty or missing texts are never the same. */
+export function sameText(a: string | null | undefined, b: string | null | undefined): boolean {
+  return !!a && !!b && normalizeText(a) === normalizeText(b)
+}
+
 /** A sentence without its final period, for messages that go inside another one. */
 export function withoutFinalPeriod(text: string): string {
   const trimmed = text.trimEnd()

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte'
-  import { formatBRL, formatMonthLong, formatMonthShort, formatRateInput, normalizeText, parseRateInput, plural } from '../lib/format'
+  import { formatBRL, formatMonthLong, formatMonthShort, formatRateInput, normalizeText, parseRateInput, plural, sameText } from '../lib/format'
   import { store } from '../lib/store.svelte'
   import {
     COST_NAME_MAX,
@@ -44,7 +44,7 @@
   /** Types offered to a fixed cost: the expense types (the one already linked included). */
   function typeOptions(item: CostItem): string[] {
     const list = [...tax.expenseTypes]
-    if (item.linkedType && !list.some((t) => normalizeText(t) === normalizeText(item.linkedType!))) list.push(item.linkedType)
+    if (item.linkedType && !list.some((t) => sameText(t, item.linkedType))) list.push(item.linkedType)
     return list
   }
 

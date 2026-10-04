@@ -24,7 +24,7 @@
 
 import * as api from './api'
 import { errorMessage } from './api'
-import { addMonths, formatMonth, isMonthKey, monthKeyOf, normalizeText } from './format'
+import { addMonths, formatMonth, isMonthKey, monthKeyOf, normalizeText, sameText } from './format'
 import { StoreDoc } from './persist.svelte'
 import { inRange, parsePeriod, periodRange, type Period, type PeriodPreset } from './period'
 import { isRecord, loadJSON, removeKey } from './storage'
@@ -242,8 +242,6 @@ const centsOrNull = (v: unknown): number | null => (isCents(v) ? v : null)
 const clip = (v: unknown, max: number): string => (typeof v === 'string' ? v.slice(0, max) : '')
 const byMonth = <T extends { month: string }>(list: T[]): T[] =>
   [...list].sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0))
-const sameType = (a: string | null | undefined, b: string | null | undefined) =>
-  !!a && !!b && normalizeText(a) === normalizeText(b)
 
 let idSeq = 0
 function newId(): string {
@@ -1027,7 +1025,7 @@ export class TaxStore {
 
   /** The fixed cost already linked to this type, if any. */
   costLinkedTo(type: string): CostItem | null {
-    return this.plan.costs.find((c) => sameType(c.linkedType, type)) ?? null
+    return this.plan.costs.find((c) => sameText(c.linkedType, type)) ?? null
   }
 
   /** Removes a cost item; undo in a toast. */

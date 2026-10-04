@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte'
   import { normalizeText } from '../lib/format'
+  import { dismissOnOutside } from '../lib/popup'
   import type { CnaeInfo } from '../lib/types'
   import Icon from './Icon.svelte'
 
@@ -27,7 +28,6 @@
   let panel: HTMLDivElement | undefined = $state()
   let input: HTMLInputElement | undefined = $state()
   let position = $state({ top: 0, left: 0, width: PANEL_WIDTH })
-  let openedAt = 0
   const uid = $props.id()
   const listId = `cnae-${uid}`
 
@@ -68,7 +68,6 @@
     query = ''
     highlighted = Math.max(0, ordered.findIndex((o) => o.code === value?.code))
     open = true
-    openedAt = performance.now()
     await tick()
     input?.focus()
     scrollToHighlighted()
@@ -112,23 +111,7 @@
 
   $effect(() => {
     if (!open) return
-    const onPointer = (e: PointerEvent) => {
-      const target = e.target as Node
-      if (!panel?.contains(target) && !button?.contains(target)) close(false)
-    }
-    const onScroll = (e: Event) => {
-      if (performance.now() - openedAt < 250) return
-      if (!(e.target instanceof Node && panel?.contains(e.target))) close(false)
-    }
-    const onResize = () => close(false)
-    document.addEventListener('pointerdown', onPointer, true)
-    document.addEventListener('scroll', onScroll, true)
-    window.addEventListener('resize', onResize)
-    return () => {
-      document.removeEventListener('pointerdown', onPointer, true)
-      document.removeEventListener('scroll', onScroll, true)
-      window.removeEventListener('resize', onResize)
-    }
+    return dismissOnOutside(() => [panel, button], () => close(false), { scroll: true })
   })
 </script>
 
