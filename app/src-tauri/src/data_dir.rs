@@ -8,8 +8,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 const CONFIG_FILE: &str = "config.json";
-/// Subfolders with the user's data, copied when the data folder changes.
-const DATA_SUBDIRS: [&str; 2] = ["profiles", "store"];
+/// Subfolders with the user's data, copied when the data folder changes (the kept extraction
+/// results too, so the new folder does not read every PDF again).
+const DATA_SUBDIRS: [&str; 3] = ["profiles", "store", "cache"];
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -150,6 +151,10 @@ mod tests {
         write(&default.join("store/planning.json"), r#"{"version":1}"#);
         write(&default.join("profiles/recibos-1.json"), "{}");
         write(&default.join("store/notes.txt"), "not copied");
+        write(
+            &default.join("cache/results.json"),
+            r#"{"key":"k","results":{}}"#,
+        );
 
         let new_dir = switch(&default, &default, Some(&drive), true).unwrap();
         assert_eq!(new_dir, drive);
@@ -158,6 +163,7 @@ mod tests {
             r#"{"version":1}"#
         );
         assert!(drive.join("profiles/recibos-1.json").is_file());
+        assert!(drive.join("cache/results.json").is_file());
         assert!(!drive.join("store/notes.txt").exists());
         assert!(!drive.join(".nfsetable-teste").exists());
         assert_eq!(resolve(&default), (drive.clone(), None));

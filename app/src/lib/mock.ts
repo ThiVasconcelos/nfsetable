@@ -1020,6 +1020,17 @@ let resultCacheDirty = false
 const resultsKey = (dir: string) => `${dirPrefix(dir)}mock.results`
 const resultCacheKey = (profiles: Profile[]) => `mock-1:${JSON.stringify(profiles)}`
 
+/** Writes the kept results of their data folder when they changed. */
+function writeResultCache() {
+  if (!resultCacheDirty || !resultCache) return
+  resultCacheDirty = false
+  try {
+    window.localStorage.setItem(resultsKey(resultCacheDir), JSON.stringify(resultCache))
+  } catch {
+    // Ignore: the demo reads the files again next time.
+  }
+}
+
 /** The cache of the data folder in use, emptied when `key` differs from the one it was read with. */
 function results(key: string): ResultCache {
   const dir = currentDataDir()
@@ -1347,6 +1358,8 @@ export function createMockBackend(): Backend {
       const target = path?.trim() || DEFAULT_DATA_DIR
       if (/^[a-z]:\/?$/i.test(target) || target.startsWith('Z:')) throw `Não foi possível gravar na pasta ${target} (modo demonstração).`
       const current = currentDataDir()
+      // Like the backend: the kept results are written first, so a copy takes them along.
+      writeResultCache()
       if (copy && !samePath(target, current)) {
         try {
           const from = dirPrefix(current)
@@ -1354,7 +1367,7 @@ export function createMockBackend(): Backend {
           const keys: string[] = []
           for (let i = 0; i < window.localStorage.length; i++) {
             const key = window.localStorage.key(i)
-            if (key && (key.startsWith(`${from}store.`) || key === `${from}mock.profiles`)) keys.push(key)
+            if (key && (key.startsWith(`${from}store.`) || key === `${from}mock.profiles` || key === resultsKey(current))) keys.push(key)
           }
           for (const key of keys) window.localStorage.setItem(to + key.slice(from.length), window.localStorage.getItem(key)!)
           // Profiles never saved in the default folder are still the demo rules: copy them too.
@@ -1455,13 +1468,7 @@ export function createMockBackend(): Backend {
     },
 
     async saveCachedResults(): Promise<void> {
-      if (!resultCacheDirty || !resultCache) return
-      resultCacheDirty = false
-      try {
-        window.localStorage.setItem(resultsKey(resultCacheDir), JSON.stringify(resultCache))
-      } catch {
-        // Ignore: the demo reads the files again next time.
-      }
+      writeResultCache()
     },
 
     async renderPage(path: string, page: number, _width: number): Promise<RenderedPage> {

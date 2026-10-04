@@ -184,12 +184,12 @@ pub async fn set_data_dir(
         .map(str::trim)
         .filter(|p| !p.is_empty())
         .map(PathBuf::from);
+    // The results kept so far are written to the old folder first, so a copy takes them along.
+    let _ = state.save_results().await;
     let (default_dir, current) = (state.default_dir.clone(), state.data_dir());
     let new_dir =
         blocking(move || data_dir::switch(&default_dir, &current, target.as_deref(), copy))
             .await??;
-    // The results kept so far stay with the old folder; the new folder has its own.
-    let _ = state.save_results().await;
     let dir = new_dir.clone();
     let cache = blocking(move || ResultCache::load(&dir)).await?;
     *state.results() = cache;
