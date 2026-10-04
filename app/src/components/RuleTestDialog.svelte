@@ -17,8 +17,12 @@
     same: boolean
   }
 
+  /** Rows shown at a time: a test over thousands of files lists the new values first. */
+  const PAGE = 200
+
   const test = $derived(store.ruleTest)
   const chosen = new SvelteSet<string>()
+  let shown = $state(PAGE)
   let saveProfile = $state(false)
   let profileName = $state('')
   let initializedSeq = -1
@@ -57,11 +61,17 @@
   const nameMissing = $derived(saveProfile && !profileName.trim())
   const canApply = $derived(!!test && !test.running && !test.saving && !nameMissing && (chosen.size > 0 || saveProfile))
 
-  // When the results of a new test arrive: preselect every file that gets a new value.
+  // When the results of a new test arrive: preselect every file that gets a new value. A closed
+  // test keeps nothing.
   $effect(() => {
-    if (!test || test.running || test.seq === initializedSeq) return
+    if (!test) {
+      untrack(() => chosen.clear())
+      return
+    }
+    if (test.running || test.seq === initializedSeq) return
     initializedSeq = test.seq
     untrack(() => {
+      shown = PAGE
       chosen.clear()
       for (const i of items) if (i.applicable) chosen.add(i.path)
       saveProfile = false
@@ -130,7 +140,7 @@
             </tr>
           </thead>
           <tbody>
-            {#each items as item (item.path)}
+            {#each items.slice(0, shown) as item (item.path)}
               <tr class:off={!item.applicable}>
                 <td class="c-check">
                   <input
@@ -159,6 +169,11 @@
             {/each}
           </tbody>
         </table>
+        {#if items.length > shown}
+          <button type="button" class="btn btn-sm more" onclick={() => (shown += PAGE)}>
+            Mostrar mais {formatInt(Math.min(PAGE, items.length - shown))} de {formatInt(items.length - shown)}
+          </button>
+        {/if}
       </div>
     {/if}
 
@@ -199,6 +214,11 @@
 </Modal>
 
 <style>
+  .more {
+    display: block;
+    margin: var(--s-2) auto;
+  }
+
   .running {
     display: flex;
     flex-direction: column;

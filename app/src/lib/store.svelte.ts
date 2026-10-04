@@ -475,7 +475,8 @@ export class AppStore {
   settingsOpen = $state(false)
   excludedOpen = $state(false)
   region = $state<RegionSelection | null>(null)
-  ruleTest = $state<RuleTestState | null>(null)
+  /** Raw state (thousands of results would become proxies): replaced, never mutated. */
+  ruleTest = $state.raw<RuleTestState | null>(null)
   dragging = $state(false)
   toasts = $state<Toast[]>([])
   /** Sidebar collapsed to a rail: null = automatic (collapses while the preview is open). */
@@ -699,7 +700,7 @@ export class AppStore {
     await safely(() =>
       api.onTestProgress((p) => {
         const test = this.ruleTest
-        if (test?.running && p.run === test.seq) test.progress = { done: p.done, total: p.total, run: p.run }
+        if (test?.running && p.run === test.seq) this.#updateRuleTest(test.seq, { progress: p })
       }),
     )
     await safely(() => api.onDragDrop((s) => this.#onDragDrop(s)))
@@ -1422,14 +1423,15 @@ export class AppStore {
     }
     try {
       const results = await api.testRule(paths, rule, seq)
-      if (this.ruleTest?.seq !== seq) return
-      this.ruleTest.results = results
+      this.#updateRuleTest(seq, { results, running: false })
     } catch (e) {
-      if (this.ruleTest?.seq !== seq) return
-      this.ruleTest.error = errorMessage(e)
-    } finally {
-      if (this.ruleTest?.seq === seq) this.ruleTest.running = false
+      this.#updateRuleTest(seq, { error: errorMessage(e), running: false })
     }
+  }
+
+  /** Changes test `seq` if it is still the one open. */
+  #updateRuleTest(seq: number, patch: Partial<RuleTestState>) {
+    if (this.ruleTest?.seq === seq) this.ruleTest = { ...this.ruleTest, ...patch }
   }
 
   /** "Cancelar": closes the dialog and stops a test still running in the backend. */
@@ -1460,8 +1462,7 @@ export class AppStore {
     this.#saveOverrides()
 
     if (profileName) {
-      state.saving = true
-      state.error = null
+      this.#updateRuleTest(state.seq, { saving: true, error: null })
       try {
         const saved = await api.saveProfile({
           id: '',
@@ -1471,14 +1472,13 @@ export class AppStore {
           namePatterns: [],
           docType: null,
           kind: null,
-          fields: { [NET_VALUE_FIELD]: [$state.snapshot(state.rule) as Rule] },
+          fields: { [NET_VALUE_FIELD]: [state.rule] },
         })
         this.toast(`Perfil “${saved.name}” salvo. As próximas leituras vão usá-lo.`, 'success')
         await this.loadProfiles()
         this.reextract()
       } catch (e) {
-        state.saving = false
-        state.error = `Não foi possível salvar o perfil: ${errorMessage(e)}`
+        this.#updateRuleTest(state.seq, { saving: false, error: `Não foi possível salvar o perfil: ${errorMessage(e)}` })
         return false
       }
     }
