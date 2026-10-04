@@ -7,6 +7,18 @@ declare const process: { env: Record<string, string | undefined> }
 // Set by `tauri dev` when developing on a mobile device / remote host.
 const host = process.env.TAURI_DEV_HOST
 
+/**
+ * JavaScript target per webview. WebView2 (Windows) is evergreen Chromium. WKWebView (macOS) can be
+ * an old Safari on an old system, so it keeps a conservative target. WebKitGTK (Linux; Tauri 2
+ * needs 4.1) and the browser build support ES2022, so class private fields (every $state field of
+ * a store) are not compiled into WeakMap lookups.
+ */
+function buildTarget(platform: string | undefined): string {
+  if (platform === 'windows') return 'chrome105'
+  if (platform === 'darwin' || platform === 'macos') return 'es2021'
+  return 'es2022'
+}
+
 // https://vite.dev/config/ — shape recommended by the Tauri 2 docs.
 export default defineConfig({
   plugins: [svelte()],
@@ -31,8 +43,7 @@ export default defineConfig({
   envPrefix: ['VITE_', 'TAURI_ENV_*'],
 
   build: {
-    // WebView2 (Windows) is evergreen Chromium; WebKitGTK/WKWebView get a conservative target.
-    target: process.env.TAURI_ENV_PLATFORM === 'windows' ? 'chrome105' : 'es2021',
+    target: buildTarget(process.env.TAURI_ENV_PLATFORM),
     outDir: 'dist',
     emptyOutDir: true,
     // Readable output and source maps for debug builds of the desktop app.
