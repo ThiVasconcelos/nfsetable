@@ -504,6 +504,8 @@ export class AppStore {
   #running = false
   #chunkBase = 0
   #seq = 0
+  /** Last profile list asked for: an older answer arriving later does not replace it. */
+  #profilesSeq = 0
   /** Last row toggled by the user: the other end of a Shift+click range. */
   #anchor: string | null = null
 
@@ -1520,8 +1522,10 @@ export class AppStore {
   // ------------------------------------------------------------ profiles
 
   async loadProfiles() {
+    const seq = ++this.#profilesSeq
     try {
-      this.profiles = await api.listProfiles()
+      const list = await api.listProfiles()
+      if (seq === this.#profilesSeq) this.profiles = list
     } catch (e) {
       this.toast(`Não foi possível carregar os perfis: ${errorMessage(e)}`, 'error')
     }

@@ -232,6 +232,12 @@ fn read_region_rejects_missing_pages() {
         .read_region(&fixture("danfse-v1.pdf"), 3, rect, FieldKind::Money)
         .unwrap_err();
     assert!(err.to_string().contains("página 4"), "{err}");
+
+    // The last possible index is an error too, not an overflow.
+    let err = engine()
+        .read_region(&fixture("danfse-v1.pdf"), u32::MAX, rect, FieldKind::Money)
+        .unwrap_err();
+    assert!(err.to_string().contains("página 4294967296"), "{err}");
 }
 
 #[test]

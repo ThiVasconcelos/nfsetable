@@ -22,7 +22,7 @@ pub enum CoreError {
     PasswordProtected,
 
     /// The requested page does not exist. `page` is 0-based; the message shows it 1-based.
-    #[error("A página {} não existe (o documento tem {count} página(s)).", .page + 1)]
+    #[error("A página {} não existe (o documento tem {count} página(s)).", u64::from(*.page) + 1)]
     PageOutOfRange { page: u32, count: u32 },
 
     /// A rule or profile is invalid (e.g. a bad regular expression).

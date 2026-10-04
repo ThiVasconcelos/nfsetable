@@ -25,15 +25,26 @@ impl ProLaboreTaxes {
     }
 }
 
-/// Pró-labore that brings the Fator R to the threshold (28%): the threshold times the monthly
-/// revenue it is measured against (RBT12 / 12, which is the average when fewer than 12 months
-/// are considered) minus the other payroll, rounded UP to the cent so the truncated Fator R does
-/// not fall short, and never below the minimum wage (the minimum wage itself without revenue).
+/// Pró-labore that brings the Fator R to `threshold` (28%) against the monthly revenue `monthly`
+/// (RBT12 / 12, the average when fewer than 12 months are considered): the threshold times it
+/// minus the other payroll, rounded UP to the cent so the truncated Fator R does not fall short;
+/// zero when the other payroll is enough.
+pub(crate) fn pro_labore_for_fator_r(
+    monthly: Decimal,
+    payroll: Decimal,
+    threshold: Decimal,
+) -> Decimal {
+    ceil_money(threshold * monthly - payroll).max(Decimal::ZERO)
+}
+
+/// The automatic pró-labore: the one that reaches the Fator R threshold, never below the minimum
+/// wage (the minimum wage itself without revenue).
 pub(crate) fn auto_pro_labore(monthly: Decimal, payroll: Decimal, tables: &Tables) -> Decimal {
     if monthly.is_zero() {
         return tables.minimum_wage;
     }
-    ceil_money(tables.simples.fator_r_threshold * monthly - payroll).max(tables.minimum_wage)
+    pro_labore_for_fator_r(monthly, payroll, tables.simples.fator_r_threshold)
+        .max(tables.minimum_wage)
 }
 
 /// INSS (11% up to the ceiling) and IRRF (monthly table, legal deductions or the simplified

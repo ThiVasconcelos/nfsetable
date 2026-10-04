@@ -7,9 +7,8 @@
 //! month itself × 12 when there is none (§2º). The pró-labore is assumed paid in all of them: the
 //! app keeps no payroll history (e.g. the months as MEI), which is left to the accountant.
 
-use super::money::ceil_money;
 use super::month::Month;
-use super::payroll::{pro_labore_taxes, ProLaboreTaxes};
+use super::payroll::{pro_labore_for_fator_r, pro_labore_taxes, ProLaboreTaxes};
 use super::revenue::annualize;
 use super::simples::{self, Annex};
 use super::tables::TaxData;
@@ -85,9 +84,10 @@ pub(crate) fn simples_month(
         annex,
         company: das.total + iss,
         owner: pro_labore_taxes(pro_labore, input.dependents, &tables),
-        pro_labore_for_annex_iii: ceil_money(
-            table.fator_r_threshold * rbt12 / Decimal::from(12) - input.payroll,
-        )
-        .max(Decimal::ZERO),
+        pro_labore_for_annex_iii: pro_labore_for_fator_r(
+            rbt12 / Decimal::from(12),
+            input.payroll,
+            table.fator_r_threshold,
+        ),
     }
 }

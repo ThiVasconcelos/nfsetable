@@ -23,8 +23,8 @@ static MONEY: LazyLock<Regex> = LazyLock::new(|| {
         (?P<sign>[-\x{2212}])?              # -R$ 10,00 (also the U+2212 minus)
         (?P<currency>R\$\s*)?               # R$, spaces optional
         (?P<sign_after>[-\x{2212}])?        # R$ -10,00
-        (?P<units>\d{1,3}(?:\.\d{3})+|\d+)  # 1.234 or 1234
-        ,(?P<cents>\d{2})                    # ,56
+        (?P<units>[0-9]{1,3}(?:\.[0-9]{3})+|[0-9]+)  # 1.234 or 1234 (ASCII digits)
+        ,(?P<cents>[0-9]{2})                          # ,56
         ",
     )
     .expect("valid money regex")
@@ -36,18 +36,17 @@ pub fn find_money(s: &str) -> Vec<MoneyMatch> {
     let mut out = Vec::new();
     for caps in MONEY.captures_iter(s) {
         let whole = caps.get(0).expect("group 0 always exists");
-        // Reject matches glued to other digits ("12.34,56", "1234,567").
+        // Reject matches glued to other digits ("12.34,56", "1234,567"), any script's digits.
         let starts_with_digit = caps.name("sign").is_none()
             && caps.name("currency").is_none()
             && caps.name("sign_after").is_none();
         let before = s[..whole.start()].chars().next_back();
         let after = s[whole.end()..].chars().next();
-        if starts_with_digit
-            && matches!(before, Some(c) if c.is_ascii_digit() || c == '.' || c == ',')
+        if starts_with_digit && matches!(before, Some(c) if c.is_numeric() || c == '.' || c == ',')
         {
             continue;
         }
-        if matches!(after, Some(c) if c.is_ascii_digit()) {
+        if matches!(after, Some(c) if c.is_numeric()) {
             continue;
         }
         let integer: String = caps["units"]
@@ -80,7 +79,8 @@ pub fn parse_money(s: &str) -> Option<i64> {
 
 /// "05/03/2026": day and month with two digits, year with four.
 static DATE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?P<day>\d{2})/(?P<month>\d{2})/(?P<year>\d{4})").expect("valid date regex")
+    Regex::new(r"(?P<day>[0-9]{2})/(?P<month>[0-9]{2})/(?P<year>[0-9]{4})")
+        .expect("valid date regex")
 });
 
 /// Days of `month` (1 to 12) in `year`, with the Gregorian leap years.
@@ -110,7 +110,7 @@ pub fn find_dates(s: &str) -> Vec<DateMatch> {
     DATE.captures_iter(s)
         .filter_map(|caps| {
             let whole = caps.get(0)?;
-            let glued = |c: Option<char>| c.is_some_and(|c| c.is_ascii_digit() || c == '/');
+            let glued = |c: Option<char>| c.is_some_and(|c| c.is_numeric() || c == '/');
             if glued(s[..whole.start()].chars().next_back())
                 || glued(s[whole.end()..].chars().next())
             {
@@ -188,6 +188,12 @@ mod tests {
             "1234,5",
             "1,234.56",
             "R$ 10",
+            // Digits of other scripts (an odd ToUnicode map) are not amounts, nor glued to one.
+            "1\u{0663}4,56",
+            "R$ 1\u{0663}4,56",
+            "1.\u{0662}34,56",
+            "\u{FF11}\u{FF12}\u{FF13},45",
+            "R$ \u{0661}\u{0662}\u{0663},\u{0664}\u{0665}",
         ] {
             assert_eq!(parse_money(text), None, "{text}");
         }
@@ -223,6 +229,9 @@ mod tests {
             "05/03/20261",
             "105/03/2026",
             "5/3/2026",
+            "\u{0661}05/03/2026",
+            "\u{0660}5/03/2026",
+            "05/03/\u{FF12}\u{FF10}\u{FF12}\u{FF16}",
         ] {
             assert_eq!(parse_date(text), None, "{text}");
         }

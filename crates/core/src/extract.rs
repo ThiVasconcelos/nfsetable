@@ -121,7 +121,7 @@ fn load(engine: &Engine, path: &Path, which: Pages) -> Result<LoadedDoc, CoreErr
     let count = page_count(pages);
     let range = match which {
         Pages::First(n) => 0..count.min(n),
-        Pages::Only(page) => page..(page + 1).min(count),
+        Pages::Only(page) => page..page.saturating_add(1).min(count),
     };
     let mut texts = Vec::with_capacity(range.len());
     for index in range {
@@ -544,12 +544,15 @@ fn text_after(
         .raw_owner
         .iter()
         .position(|&owner| owner > last_glyph)?;
-    let segment_end = line
+    // The segment the label ends in, or the next one when it ends a column (the space between two
+    // segments belongs to neither).
+    let (start, segment_end) = line
         .segments
         .iter()
-        .find(|s| s.raw.contains(&start))
-        .map(|s| s.raw.end)
-        .unwrap_or(line.raw.len());
+        .find(|s| s.raw.end > start)
+        .map_or((start, line.raw.len()), |s| {
+            (start.max(s.raw.start), s.raw.end)
+        });
     let trim = |s: &str| {
         s.trim_matches(|c: char| c.is_whitespace() || c == ':' || c == '-')
             .to_string()
@@ -882,6 +885,25 @@ mod tests {
     #[test]
     fn text_fields_read_after_the_label() {
         let page = page(&[("Tomador: EMPRESA EXEMPLO LTDA", 40.0, 300.0)]);
+        let token = apply_anchor(
+            &page,
+            FieldKind::Text,
+            &Regex::new("tomador").unwrap(),
+            None,
+            Direction::Right,
+            250.0,
+        )
+        .unwrap();
+        assert_eq!(token.text.as_deref(), Some("EMPRESA EXEMPLO LTDA"));
+    }
+
+    #[test]
+    fn text_after_a_label_column_is_the_next_column_only() {
+        let page = page(&[
+            ("Tomador", 40.0, 300.0),
+            ("EMPRESA EXEMPLO LTDA", 120.0, 300.0),
+            ("CNPJ 00.000.000/0001-91", 300.0, 300.0),
+        ]);
         let token = apply_anchor(
             &page,
             FieldKind::Text,
