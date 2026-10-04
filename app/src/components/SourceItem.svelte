@@ -22,6 +22,7 @@
     if (!info.exists) return isDir ? 'Pasta não encontrada' : 'Arquivo não encontrado'
     return plural(info.fileCount, 'PDF', 'PDFs')
   })
+  const unreadable = $derived(info?.unreadable ?? [])
 </script>
 
 <li class="source" class:missing>
@@ -34,6 +35,12 @@
       <span class="meta num">
         {#if missing}<Icon name="alert" size={12} />{/if}
         {meta}
+      </span>
+    {/if}
+    {#if unreadable.length}
+      <span class="meta unreadable" title={unreadable.join('\n')}>
+        <Icon name="alert" size={12} />
+        {plural(unreadable.length, 'pasta não pôde ser lida', 'pastas não puderam ser lidas')} (sem permissão?)
       </span>
     {/if}
   </div>
@@ -67,6 +74,10 @@
 </li>
 
 <style>
+  .meta.unreadable {
+    color: var(--warn);
+  }
+
   .source {
     display: grid;
     grid-template-columns: 20px minmax(0, 1fr) 28px;

@@ -171,6 +171,10 @@ pub struct SourceInfo {
     pub exists: bool,
     /// Number of PDF files found under this source (after exclusion).
     pub file_count: u32,
+    /// Folders (or files) below this source that could not be read, e.g. without permission
+    /// (at most a few; their PDFs are missing from the scan).
+    #[serde(default)]
+    pub unreadable: Vec<String>,
 }
 
 /// A PDF file found by the scan.
@@ -378,6 +382,9 @@ pub struct AppInfo {
     /// pt-BR warning when the chosen data folder is unavailable (the default one is used).
     #[serde(default)]
     pub data_dir_error: Option<String>,
+    /// pt-BR problems of the profile files that could not be loaded (they are left out).
+    #[serde(default)]
+    pub profile_errors: Vec<String>,
 }
 
 /// Payload of the `extract-progress` and `test-progress` events.

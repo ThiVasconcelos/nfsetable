@@ -654,22 +654,34 @@ export class AppStore {
 
   // ------------------------------------------------------------ boot
 
+  /** The backend's information; reports the profile files left out. */
+  setInfo(info: AppInfo) {
+    this.info = info
+    const problems = info.profileErrors ?? []
+    if (problems.length) {
+      const what = plural(problems.length, 'perfil não pôde ser lido', 'perfis não puderam ser lidos')
+      this.toast(`${what} e ${problems.length === 1 ? 'ficou' : 'ficaram'} de fora das regras: ${problems.join('; ')}`, 'error')
+    }
+  }
+
   /**
    * Starts the app. `loadData` reads the documents of the data folder (the companies, then the
    * notes and the planning of the active one) before anything is shown.
    */
   async init(loadData: () => Promise<void> = () => this.loadNotes()) {
     this.applyTheme()
+    let info: AppInfo
     try {
-      this.info = await api.appInfo()
+      info = await api.appInfo()
     } catch (e) {
       this.bootError = errorMessage(e)
       this.boot = 'failed'
       return
     }
+    this.setInfo(info)
     await loadData()
     this.boot = 'ready'
-    if (!this.info.pdfiumOk) return
+    if (!info.pdfiumOk) return
 
     const safely = async (what: () => Promise<unknown>) => {
       try {

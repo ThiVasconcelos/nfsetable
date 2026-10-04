@@ -12,6 +12,9 @@ use std::sync::{LazyLock, Mutex, PoisonError};
 use std::time::SystemTime;
 use walkdir::{DirEntry, WalkDir};
 
+/// Unreadable paths reported per source (enough to say what is missing).
+const MAX_UNREADABLE: usize = 20;
+
 /// Size and modification time of a file, as listed (no extra open per file).
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct Stamp {
@@ -55,13 +58,24 @@ pub fn scan(options: &ScanOptions) -> ScanResult {
         let exists = metadata.is_some();
         let is_dir = metadata.as_ref().is_some_and(|m| m.is_dir());
         let mut file_count = 0u32;
+        let mut unreadable = Vec::new();
 
         if is_dir {
             let max_depth = if source.recursive { usize::MAX } else { 1 };
             let base = display_path(&root);
             let walker = WalkDir::new(&root).min_depth(1).max_depth(max_depth);
-            // Entries that fail (e.g. permission denied on a subfolder) are skipped.
-            for entry in walker.into_iter().filter_map(Result::ok) {
+            // Entries that fail (e.g. permission denied on a subfolder) are skipped and reported.
+            for entry in walker {
+                let entry = match entry {
+                    Ok(entry) => entry,
+                    Err(error) => {
+                        if unreadable.len() < MAX_UNREADABLE {
+                            let path = error.path().unwrap_or(&root);
+                            unreadable.push(path_to_string(path));
+                        }
+                        continue;
+                    }
+                };
                 if !is_pdf(entry.path()) {
                     continue;
                 }
@@ -88,6 +102,7 @@ pub fn scan(options: &ScanOptions) -> ScanResult {
             is_dir,
             exists,
             file_count,
+            unreadable,
         });
     }
 
@@ -333,6 +348,28 @@ mod tests {
             again,
             format!("{:x}", Sha256::digest(b"%PDF-1.4 conteudo B"))
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn reports_folders_it_cannot_read() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let closed = dir.path().join("fechada");
+        fs::create_dir(&closed).unwrap();
+        fs::write(closed.join("nota.pdf"), b"%PDF").unwrap();
+        fs::write(dir.path().join("aberta.pdf"), b"%PDF aberta").unwrap();
+        fs::set_permissions(&closed, fs::Permissions::from_mode(0o000)).unwrap();
+        if fs::read_dir(&closed).is_ok() {
+            // Running as root: permissions are not enforced.
+            fs::set_permissions(&closed, fs::Permissions::from_mode(0o755)).unwrap();
+            return;
+        }
+        let result = scan_dir(dir.path());
+        fs::set_permissions(&closed, fs::Permissions::from_mode(0o755)).unwrap();
+        assert_eq!(result.files.len(), 1);
+        assert_eq!(result.sources[0].unreadable.len(), 1);
+        assert!(result.sources[0].unreadable[0].ends_with("fechada"));
     }
 
     #[test]

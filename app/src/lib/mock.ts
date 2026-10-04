@@ -1239,12 +1239,15 @@ export interface MockControls {
   log: { scans: number; reads: string[]; extracted: number; renders: number; tested: number }
   /** Paths the scan cannot read (empty hash, like a file locked by another program). */
   unreadable: Set<string>
+  /** Folders the scan cannot enter (no permission): reported by their source. */
+  deniedDirs: Set<string>
 }
 
 const exportLog: ExportRequest[] = []
 const taxLog: TaxInput[] = []
 const callLog = { scans: 0, reads: [] as string[], extracted: 0, renders: 0, tested: 0 }
 const unreadable = new Set<string>()
+const deniedDirs = new Set<string>()
 /** The rule test allowed to go on (0: none), like the backend's. */
 let activeTestRun = 0
 
@@ -1294,6 +1297,7 @@ function installControls() {
     taxInputs: taxLog,
     log: callLog,
     unreadable,
+    deniedDirs,
   }
   window.__mock = controls
 }
@@ -1319,6 +1323,7 @@ function mockAppInfo(): AppInfo {
     dataDir,
     defaultDataDir: DEFAULT_DATA_DIR,
     dataDirError,
+    profileErrors: [],
   }
 }
 
@@ -1391,15 +1396,16 @@ export function createMockBackend(): Backend {
             found.set(doc.path, doc)
             count++
           }
-          infos.push({ path: source.path, isDir: true, exists: true, fileCount: count })
+          const denied = [...deniedDirs].filter((d) => d.startsWith(`${path}/`))
+          infos.push({ path: source.path, isDir: true, exists: true, fileCount: count, unreadable: denied })
         } else if (DOCS.has(path)) {
           const doc = DOCS.get(path)!
           const skip = excludedName(doc.name)
           if (skip) excluded.add(doc.path)
           else found.set(doc.path, doc)
-          infos.push({ path: source.path, isDir: false, exists: true, fileCount: skip ? 0 : 1 })
+          infos.push({ path: source.path, isDir: false, exists: true, fileCount: skip ? 0 : 1, unreadable: [] })
         } else {
-          infos.push({ path: source.path, isDir: !isPdfPath(path), exists: false, fileCount: 0 })
+          infos.push({ path: source.path, isDir: !isPdfPath(path), exists: false, fileCount: 0, unreadable: [] })
         }
       }
       const docs = [...found.values()].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))

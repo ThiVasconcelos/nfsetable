@@ -21,7 +21,19 @@ struct Config {
 /// The data folder to use at startup, plus a pt-BR warning when the chosen one is unavailable
 /// (e.g. a disconnected drive): then the default folder is used until it comes back.
 pub fn resolve(default_dir: &Path) -> (PathBuf, Option<String>) {
-    match load(default_dir).data_dir {
+    let config = match load(default_dir) {
+        Ok(config) => config,
+        Err(problem) => {
+            return (
+                default_dir.to_path_buf(),
+                Some(format!(
+                    "Não foi possível ler a escolha da pasta de dados ({CONFIG_FILE}: {problem}); \
+                     usando a pasta padrão. Escolha a pasta de novo nas configurações."
+                )),
+            )
+        }
+    };
+    match config.data_dir {
         None => (default_dir.to_path_buf(), None),
         Some(dir) if dir.is_dir() => (dir, None),
         Some(dir) => (
@@ -54,11 +66,14 @@ pub fn switch(
     Ok(new_dir)
 }
 
-fn load(default_dir: &Path) -> Config {
-    fs::read_to_string(default_dir.join(CONFIG_FILE))
-        .ok()
-        .and_then(|json| serde_json::from_str(&json).ok())
-        .unwrap_or_default()
+/// The saved choice; a missing file means none, an unreadable or corrupt one is an error.
+fn load(default_dir: &Path) -> Result<Config, String> {
+    let json = match fs::read_to_string(default_dir.join(CONFIG_FILE)) {
+        Ok(json) => json,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Config::default()),
+        Err(e) => return Err(e.to_string()),
+    };
+    serde_json::from_str(&json).map_err(|e| e.to_string())
 }
 
 fn save(default_dir: &Path, data_dir: Option<&Path>) -> Result<(), String> {
@@ -177,5 +192,20 @@ mod tests {
         let (dir, warning) = resolve(&default);
         assert_eq!(dir, default);
         assert!(warning.unwrap().contains("não está disponível"));
+    }
+
+    #[test]
+    fn corrupt_config_falls_back_with_a_warning() {
+        let root = tempfile::tempdir().unwrap();
+        let default = root.path().join("default");
+        fs::create_dir_all(&default).unwrap();
+        fs::write(default.join(CONFIG_FILE), "{\"dataDir\": \"D:/dados\"").unwrap();
+        let (dir, warning) = resolve(&default);
+        assert_eq!(dir, default);
+        let warning = warning.expect("a corrupt choice is reported");
+        assert!(warning.contains("config.json"), "{warning}");
+        // No file at all: the default folder, silently.
+        fs::remove_file(default.join(CONFIG_FILE)).unwrap();
+        assert_eq!(resolve(&default), (default.clone(), None));
     }
 }

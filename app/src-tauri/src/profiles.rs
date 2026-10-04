@@ -11,21 +11,24 @@ use std::time::{SystemTime, UNIX_EPOCH};
 const MAX_ID_LEN: usize = 80;
 const MAX_SLUG_LEN: usize = 40;
 
-/// Loads every valid profile of `dir`, sorted by name. Unreadable or invalid files are skipped.
-pub fn load_all(dir: &Path) -> Vec<Profile> {
+/// Loads every valid profile of `dir`, sorted by name, plus a pt-BR problem for each profile file
+/// left out (unreadable, invalid JSON or an invalid rule).
+pub fn load_all(dir: &Path) -> (Vec<Profile>, Vec<String>) {
     let Ok(entries) = fs::read_dir(dir) else {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     };
+    let mut problems = Vec::new();
     let mut profiles: Vec<Profile> = entries
         .filter_map(Result::ok)
         .map(|entry| entry.path())
         .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
         .filter_map(|path| {
-            let json = fs::read_to_string(&path).ok()?;
-            let mut profile: Profile = serde_json::from_str(&json).ok()?;
-            profile.builtin = false;
-            validate_profile(&profile).ok()?;
-            Some(profile)
+            let loaded = load_one(&path);
+            if let Err(problem) = &loaded {
+                let name = path.file_name().unwrap_or_default().to_string_lossy();
+                problems.push(format!("{name}: {problem}"));
+            }
+            loaded.ok()
         })
         .collect();
     profiles.sort_by(|a, b| {
@@ -33,7 +36,17 @@ pub fn load_all(dir: &Path) -> Vec<Profile> {
             .cmp(&normalize(&b.name))
             .then(a.id.cmp(&b.id))
     });
-    profiles
+    problems.sort();
+    (profiles, problems)
+}
+
+fn load_one(path: &Path) -> Result<Profile, String> {
+    let json = fs::read_to_string(path).map_err(|e| format!("não foi possível ler ({e})"))?;
+    let mut profile: Profile =
+        serde_json::from_str(&json).map_err(|e| format!("JSON inválido ({e})"))?;
+    profile.builtin = false;
+    validate_profile(&profile).map_err(|e| e.to_string())?;
+    Ok(profile)
 }
 
 /// Validates and writes a profile, assigning an id when it has none. Returns the saved profile.
@@ -145,7 +158,7 @@ mod tests {
         assert!(!saved.builtin);
 
         let other = save(dir.path(), profile("Área Azul")).unwrap();
-        let loaded = load_all(dir.path());
+        let (loaded, _) = load_all(dir.path());
         assert_eq!(
             loaded.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(),
             ["Área Azul", "Prefeitura de São Exemplo"]
@@ -155,11 +168,11 @@ mod tests {
         let mut renamed = other.clone();
         renamed.name = "Zona Leste".to_string();
         save(dir.path(), renamed).unwrap();
-        assert_eq!(load_all(dir.path()).len(), 2);
+        assert_eq!(load_all(dir.path()).0.len(), 2);
 
         delete(dir.path(), &saved.id).unwrap();
         delete(dir.path(), &saved.id).unwrap();
-        assert_eq!(load_all(dir.path()).len(), 1);
+        assert_eq!(load_all(dir.path()).0.len(), 1);
     }
 
     #[test]
@@ -179,7 +192,13 @@ mod tests {
         fs::write(dir.path().join("broken.json"), "{ not json").unwrap();
         fs::write(dir.path().join("notes.txt"), "hello").unwrap();
         save(dir.path(), profile("Ok")).unwrap();
-        assert_eq!(load_all(dir.path()).len(), 1);
-        assert!(load_all(&dir.path().join("missing")).is_empty());
+        let (profiles, problems) = load_all(dir.path());
+        assert_eq!(profiles.len(), 1);
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(
+            problems[0].starts_with("broken.json: JSON inválido"),
+            "{problems:?}"
+        );
+        assert!(load_all(&dir.path().join("missing")).0.is_empty());
     }
 }

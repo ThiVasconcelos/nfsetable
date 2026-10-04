@@ -29,7 +29,7 @@ class DataDirState {
     try {
       await Promise.all([store.notesDoc.flush(), tax.flush(), companies.doc.flush()])
       const info = await api.setDataDir(path, copy)
-      store.info = info
+      store.setInfo(info)
       this.bannerDismissed = false
       store.resetView()
       await companies.load()

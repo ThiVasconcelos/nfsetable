@@ -131,6 +131,8 @@ export interface SourceInfo {
   exists: boolean
   /** Number of PDF files found under this source (after exclusion). */
   fileCount: number
+  /** Folders (or files) below this source that could not be read, e.g. without permission (at most a few). */
+  unreadable: string[]
 }
 
 /** A PDF file found by the scan. */
@@ -286,6 +288,8 @@ export interface AppInfo {
   defaultDataDir: string
   /** pt-BR warning when the chosen data folder is unavailable (the default one is used). */
   dataDirError: string | null
+  /** pt-BR problems of the profile files that could not be loaded (they are left out). */
+  profileErrors: string[]
 }
 
 /** Payload of the "extract-progress" and "test-progress" events. */

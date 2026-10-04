@@ -88,7 +88,7 @@ impl AppState {
     /// Built-in profiles first, then the user's.
     fn all_profiles(&self) -> Vec<Profile> {
         let mut all = builtin_profiles();
-        all.extend(profiles::load_all(&self.profiles_dir()));
+        all.extend(profiles::load_all(&self.profiles_dir()).0);
         all
     }
 
@@ -101,6 +101,7 @@ impl AppState {
             data_dir: self.data_dir().to_string_lossy().into_owned(),
             default_data_dir: self.default_dir.to_string_lossy().into_owned(),
             data_dir_error: read_lock(&self.data_dir_error),
+            profile_errors: profiles::load_all(&self.profiles_dir()).1,
         }
     }
 }
