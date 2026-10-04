@@ -200,7 +200,6 @@ fn push_text(out: &mut String, dialect: Dialect, text: &str) {
     out.push('\'');
 }
 
-/// The first `max` characters of `text`.
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1142,11 +1142,7 @@ export class AppStore {
       else delete all[hash]
     }
     this.overrides = all
-    if (persist) this.#saveOverrides()
-  }
-
-  #saveOverrides() {
-    this.notesDoc.changed()
+    if (persist) this.notesDoc.changed()
   }
 
   /** Sets a manual value; `null` reverts to the extracted value. */
@@ -1243,7 +1239,7 @@ export class AppStore {
     if ([...this.selected].every((path) => removing.has(path))) this.selected.clear()
     else for (const path of removing) this.selected.delete(path)
     if (this.activePath && removing.has(this.activePath)) this.closePreview()
-    this.#saveHiddenCopies()
+    this.notesDoc.changed()
     const message =
       rows.length === 1
         ? `“${rows[0].name}” saiu da lista.`
@@ -1253,7 +1249,7 @@ export class AppStore {
       run: () => {
         for (const path of copies) this.hiddenCopies.delete(path)
         this.#patchOverrides(hashes.map((hash): OverrideChange => [hash, {}, ['removed']]))
-        this.#saveHiddenCopies()
+        this.notesDoc.changed()
       },
     })
   }
@@ -1264,10 +1260,6 @@ export class AppStore {
       files.map(fileKey).filter((key) => this.overrides[key]?.removed).map((key): OverrideChange => [key, {}, ['removed']]),
     )
     for (const f of files) this.hiddenCopies.delete(f.path)
-    this.#saveHiddenCopies()
-  }
-
-  #saveHiddenCopies() {
     this.notesDoc.changed()
   }
 

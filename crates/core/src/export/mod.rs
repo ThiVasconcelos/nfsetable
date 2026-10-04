@@ -585,9 +585,6 @@ mod tests {
     }
 
     #[test]
-    fn formats_decimals_with_a_point() {}
-
-    #[test]
     fn rejects_unusable_destinations() {
         let dir = std::env::temp_dir();
         assert!(matches!(
