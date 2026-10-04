@@ -1,5 +1,6 @@
-//! Tauri commands: thin wrappers over `nfsetable-core`. Heavy work runs on the blocking thread pool so
-//! the UI never freezes; long batches report progress through events.
+//! Tauri commands: thin wrappers over `nfsetable-core`. Every command that touches the disk or does
+//! real work is async and runs it on the blocking thread pool, so the window (whose thread handles
+//! every IPC call) never waits for it; long batches report progress through events.
 
 use crate::results::{self, ResultCache};
 use crate::{data_dir, profiles, store};
@@ -85,11 +86,8 @@ impl AppState {
         self.data_dir().join("store")
     }
 
-    /// Built-in profiles first, then the user's.
     fn all_profiles(&self) -> Vec<Profile> {
-        let mut all = builtin_profiles();
-        all.extend(profiles::load_all(&self.profiles_dir()).0);
-        all
+        all_profiles_in(&self.profiles_dir())
     }
 
     fn info(&self, app: &AppHandle) -> AppInfo {
@@ -104,6 +102,13 @@ impl AppState {
             profile_errors: profiles::load_all(&self.profiles_dir()).1,
         }
     }
+}
+
+/// Built-in profiles first, then the user's in `dir`.
+fn all_profiles_in(dir: &Path) -> Vec<Profile> {
+    let mut all = builtin_profiles();
+    all.extend(profiles::load_all(dir).0);
+    all
 }
 
 fn net_value_field() -> FieldDef {
@@ -161,14 +166,14 @@ async fn blocking<T: Send + 'static>(
 }
 
 #[tauri::command]
-pub fn app_info(app: AppHandle, state: State<'_, AppState>) -> AppInfo {
-    state.info(&app)
+pub async fn app_info(app: AppHandle, state: State<'_, AppState>) -> Result<AppInfo, String> {
+    Ok(state.info(&app))
 }
 
 /// Changes the folder of the persistent data (`path` = None goes back to the default). With
 /// `copy`, the current profiles and stored documents are copied there first.
 #[tauri::command]
-pub fn set_data_dir(
+pub async fn set_data_dir(
     app: AppHandle,
     state: State<'_, AppState>,
     path: Option<String>,
@@ -179,21 +184,15 @@ pub fn set_data_dir(
         .map(str::trim)
         .filter(|p| !p.is_empty())
         .map(PathBuf::from);
-    let new_dir = data_dir::switch(
-        &state.default_dir,
-        &state.data_dir(),
-        target.as_deref(),
-        copy,
-    )?;
+    let (default_dir, current) = (state.default_dir.clone(), state.data_dir());
+    let new_dir =
+        blocking(move || data_dir::switch(&default_dir, &current, target.as_deref(), copy))
+            .await??;
     // The results kept so far stay with the old folder; the new folder has its own.
-    {
-        let _turn = lock(&state.results_writer);
-        let pending = state.results().pending_save();
-        if let Some((old_path, json)) = pending {
-            let _ = results::write(&old_path, &json);
-        }
-    }
-    *state.results() = ResultCache::load(&new_dir);
+    let _ = state.save_results().await;
+    let dir = new_dir.clone();
+    let cache = blocking(move || ResultCache::load(&dir)).await?;
+    *state.results() = cache;
     set_lock(&state.data_dir, new_dir);
     set_lock(&state.data_dir_error, None);
     Ok(state.info(&app))
@@ -322,24 +321,27 @@ pub fn cancel_test(state: State<'_, AppState>, run: u32) {
 }
 
 #[tauri::command]
-pub fn list_profiles(state: State<'_, AppState>) -> Vec<Profile> {
-    state.all_profiles()
+pub async fn list_profiles(state: State<'_, AppState>) -> Result<Vec<Profile>, String> {
+    let dir = state.profiles_dir();
+    blocking(move || all_profiles_in(&dir)).await
 }
 
 #[tauri::command]
-pub fn save_profile(state: State<'_, AppState>, profile: Profile) -> Result<Profile, String> {
+pub async fn save_profile(state: State<'_, AppState>, profile: Profile) -> Result<Profile, String> {
     if builtin_profiles().iter().any(|p| p.id == profile.id) {
         return Err("Perfis embutidos não podem ser alterados.".to_string());
     }
-    profiles::save(&state.profiles_dir(), profile)
+    let dir = state.profiles_dir();
+    blocking(move || profiles::save(&dir, profile)).await?
 }
 
 #[tauri::command]
-pub fn delete_profile(state: State<'_, AppState>, id: String) -> Result<(), String> {
+pub async fn delete_profile(state: State<'_, AppState>, id: String) -> Result<(), String> {
     if builtin_profiles().iter().any(|p| p.id == id) {
         return Err("Perfis embutidos não podem ser excluídos.".to_string());
     }
-    profiles::delete(&state.profiles_dir(), &id)
+    let dir = state.profiles_dir();
+    blocking(move || profiles::delete(&dir, &id)).await?
 }
 
 #[tauri::command]
@@ -362,28 +364,31 @@ pub async fn tax_report(input: TaxInput) -> Result<TaxReport, String> {
 }
 
 #[tauri::command]
-pub fn tax_catalog() -> TaxCatalog {
+pub async fn tax_catalog() -> TaxCatalog {
     nfsetable_core::tax_catalog()
 }
 
 #[tauri::command]
-pub fn read_store(
+pub async fn read_store(
     state: State<'_, AppState>,
     name: String,
 ) -> Result<Option<serde_json::Value>, String> {
-    store::read(&state.store_dir(), &name)
+    let dir = state.store_dir();
+    blocking(move || store::read(&dir, &name)).await?
 }
 
 #[tauri::command]
-pub fn write_store(
+pub async fn write_store(
     state: State<'_, AppState>,
     name: String,
     value: serde_json::Value,
 ) -> Result<(), String> {
-    store::write(&state.store_dir(), &name, &value)
+    let dir = state.store_dir();
+    blocking(move || store::write(&dir, &name, &value)).await?
 }
 
 #[tauri::command]
-pub fn delete_store(state: State<'_, AppState>, name: String) -> Result<(), String> {
-    store::delete(&state.store_dir(), &name)
+pub async fn delete_store(state: State<'_, AppState>, name: String) -> Result<(), String> {
+    let dir = state.store_dir();
+    blocking(move || store::delete(&dir, &name)).await?
 }
