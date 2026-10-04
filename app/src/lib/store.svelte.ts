@@ -494,7 +494,10 @@ export class AppStore {
 
   // Internals (not reactive)
   #cache = new Map<string, DocResult>()
-  /** Bumped by forgetCache(): a run that started before it neither caches nor shows its results. */
+  /**
+   * Bumped by forgetCache() and resetView(): a run that started before it neither caches nor shows
+   * its results (stale profiles, or another company).
+   */
   #generation = 0
   #dirty = false
   #running = false
@@ -733,6 +736,8 @@ export class AppStore {
 
   /** Another company: nothing of the previous one stays on screen (UI preferences are kept). */
   resetView() {
+    // A scan or reading of the previous company still on its way is dropped when it lands.
+    this.#generation++
     // "Desfazer" acts on whatever company is open when it is clicked, so it dies with this one.
     this.toasts = this.toasts.filter((t) => !t.action)
     this.clearSelection()
