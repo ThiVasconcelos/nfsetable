@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { formatBRL, formatPercent, formatBRLCompact } from '../lib/format'
+  import { formatBRL, formatPercent } from '../lib/format'
   import { taxHint, taxName } from '../lib/labels'
   import type { SimplesActivity, SimplesReport } from '../lib/types'
   import Icon from './Icon.svelte'
@@ -9,20 +9,15 @@
   interface Props {
     simples: SimplesReport
     activity: SimplesActivity
-    /** Year of the reference month (for the ME limit). */
-    year: string
     /** The pró-labore is automatic (then it already is the one for the Annex III). */
     automatic: boolean
   }
 
-  let { simples: s, activity, year, automatic }: Props = $props()
+  let { simples: s, activity, automatic }: Props = $props()
 
-  const ME_LIMIT = 36_000_000
   const tier = $derived(s.meLimitRemainingCents > 0 ? 'ME' : 'EPP')
   const annexIii = $derived(s.annex === 'III')
   const fatorMax = $derived(Math.min(1, Math.max(0.4, s.fatorR * 1.15)))
-  const meUsed = $derived(Math.max(0, ME_LIMIT - s.meLimitRemainingCents))
-  const meRatio = $derived(meUsed / ME_LIMIT)
 </script>
 
 <TaxCard
@@ -101,23 +96,6 @@
       </ul>
     </div>
   {/if}
-
-  <div class="limit">
-    <span class="label">Limite da ME: R$ 360 mil por ano</span>
-    <Meter
-      value={meRatio}
-      max={1}
-      tone={meRatio >= 1 ? 'danger' : meRatio >= 0.8 ? 'warn' : 'accent'}
-      label="Limite da microempresa"
-      valueText="{formatBRLCompact(meUsed)} de R$ 360 mil faturados em {year}"
-    />
-    <p class="limit-foot num">
-      <span>Faturado em {year}: {formatBRL(meUsed)}</span>
-      <span class:over={s.meLimitRemainingCents === 0}>
-        {s.meLimitRemainingCents > 0 ? `restam ${formatBRL(s.meLimitRemainingCents)}` : 'limite atingido: EPP'}
-      </span>
-    </p>
-  </div>
 </TaxCard>
 
 <style>
@@ -212,29 +190,5 @@
 
   .split li .num {
     color: var(--text);
-  }
-
-  .limit {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .limit-foot {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 2px 12px;
-    font-size: 12px;
-    color: var(--text-3);
-  }
-
-  .limit-foot span:last-child {
-    font-weight: 500;
-    color: var(--text-2);
-  }
-
-  .limit-foot .over {
-    color: var(--danger);
   }
 </style>

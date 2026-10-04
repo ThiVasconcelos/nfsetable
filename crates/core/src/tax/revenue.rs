@@ -105,7 +105,7 @@ pub(crate) fn summarize(months: BTreeMap<Month, Decimal>, reference: Month) -> R
 }
 
 impl Revenue {
-    pub fn to_contract(&self) -> RevenueSummary {
+    pub fn to_contract(&self, year_projection: Decimal) -> RevenueSummary {
         RevenueSummary {
             months: self
                 .months
@@ -120,6 +120,7 @@ impl Revenue {
             average_monthly_cents: to_cents(self.average),
             month_cents: to_cents(self.month),
             year_to_date_cents: to_cents(self.year_to_date),
+            year_projection_cents: to_cents(year_projection),
             rbt12_cents: to_cents(self.rbt12),
             rbt12_annualized: self.annualized && self.count > 0,
         }

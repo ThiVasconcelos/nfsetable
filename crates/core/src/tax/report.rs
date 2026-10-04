@@ -217,7 +217,7 @@ impl<'a> Estimate<'a> {
         let (das, outlook, owner) = (&self.das, &self.outlook, &self.owner);
         TaxReport {
             reference_month: input.reference.iso(),
-            revenue: revenue.to_contract(),
+            revenue: revenue.to_contract(outlook.projection),
             mei: MeiReport {
                 limit_cents: to_cents(outlook.limit),
                 year_to_date_cents: to_cents(ytd),
@@ -243,6 +243,8 @@ impl<'a> Estimate<'a> {
                 me_limit_remaining_cents: to_cents(
                     (tables.simples.me_limit - ytd).max(Decimal::ZERO),
                 ),
+                me_limit_cents: to_cents(tables.simples.me_limit),
+                epp_limit_cents: to_cents(tables.simples.epp_limit),
             },
             pro_labore: ProLaboreReport {
                 gross_cents: to_cents(owner.gross),
@@ -438,6 +440,7 @@ pub(crate) fn zero_report(input: &Input, warnings: Vec<String>) -> TaxReport {
             average_monthly_cents: 0,
             month_cents: 0,
             year_to_date_cents: 0,
+            year_projection_cents: 0,
             rbt12_cents: 0,
             rbt12_annualized: false,
         },
@@ -464,6 +467,8 @@ pub(crate) fn zero_report(input: &Input, warnings: Vec<String>) -> TaxReport {
             split: Vec::new(),
             pro_labore_for_annex_iii_cents: 0,
             me_limit_remaining_cents: 0,
+            me_limit_cents: 0,
+            epp_limit_cents: 0,
         },
         pro_labore: ProLaboreReport {
             gross_cents: 0,

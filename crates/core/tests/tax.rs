@@ -134,8 +134,16 @@ fn three_months_of_5000_in_2026() {
         ]
     );
     assert_eq!(simples.pro_labore_for_annex_iii_cents, 162_100);
-    // ME limit: 360.000 − 15.000 = 345.000.
+    // ME limit: 360.000 − 15.000 = 345.000; the Simples ceiling (EPP) is 4.800.000.
     assert_eq!(simples.me_limit_remaining_cents, 34_500_000);
+    assert_eq!(simples.me_limit_cents, 36_000_000);
+    assert_eq!(simples.epp_limit_cents, 480_000_000);
+    // The year's projection is the revenue's, whatever the regime (the MEI card shows the same).
+    assert_eq!(report.revenue.year_projection_cents, 6_000_000);
+    assert_eq!(
+        report.revenue.year_projection_cents,
+        report.mei.year_projection_cents
+    );
 
     // MEI: YTD 15.000 of 81.000; projection 15.000 + 5.000 × 9 = 60.000; DAS 81,05 + 5,00.
     let mei = &report.mei;
@@ -758,6 +766,9 @@ fn report_json_shape() {
     assert_eq!(value["simples"]["fatorR"], 0.32);
     assert_eq!(value["simples"]["proLaboreForAnnexIiiCents"], 162_100);
     assert_eq!(value["simples"]["meLimitRemainingCents"], 34_500_000);
+    assert_eq!(value["simples"]["meLimitCents"], 36_000_000);
+    assert_eq!(value["simples"]["eppLimitCents"], 480_000_000);
+    assert_eq!(value["revenue"]["yearProjectionCents"], 6_000_000);
     assert_eq!(
         value["simples"]["split"][0],
         json!({"tax": "irpj", "cents": 1_200})

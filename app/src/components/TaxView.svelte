@@ -21,6 +21,7 @@
   import TaxRevenueTab from './TaxRevenueTab.svelte'
   import TaxSettings from './TaxSettings.svelte'
   import TaxSimplesCard from './TaxSimplesCard.svelte'
+  import TaxSimplesLimitCard from './TaxSimplesLimitCard.svelte'
 
   const ALL_TABS: { id: TaxTab; label: string }[] = [
     { id: 'summary', label: 'Resumo' },
@@ -371,14 +372,19 @@
                   flow={report.cashFlow ?? []}
                   ondetails={() => selectTab('prolabore')}
                 />
-                <TaxSimplesCard simples={report.simples} activity={tax.activity} {year} automatic={report.proLabore.automatic} />
+                <TaxSimplesCard simples={report.simples} activity={tax.activity} automatic={report.proLabore.automatic} />
               {/if}
-              <TaxMeiCard
-                mei={report.mei}
-                cnae={tax.cnaeInfo}
-                {year}
-                openingYear={tax.settings.openingMonth?.slice(0, 4) === year}
-              />
+              <!-- The limit of the current regime (the comparativo still shows the MEI to everyone). -->
+              {#if mei}
+                <TaxMeiCard
+                  mei={report.mei}
+                  cnae={tax.cnaeInfo}
+                  {year}
+                  openingYear={tax.settings.openingMonth?.slice(0, 4) === year}
+                />
+              {:else if tax.settings.regime === 'simples'}
+                <TaxSimplesLimitCard revenue={report.revenue} simples={report.simples} {year} />
+              {/if}
               <TaxComparison comparison={report.comparison} current={currentRegime} />
               <TaxLeftoverCard
                 leftover={report.leftover}

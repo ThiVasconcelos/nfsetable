@@ -497,6 +497,7 @@ export function mockTaxReport(input: TaxInput): TaxReport {
       averageMonthlyCents: average,
       monthCents: months.find((m) => m.month === ref)?.cents ?? 0,
       yearToDateCents: yearToDate,
+      yearProjectionCents: projection,
       rbt12Cents: rbt12,
       rbt12Annualized: annualized,
     },
@@ -523,6 +524,8 @@ export function mockTaxReport(input: TaxInput): TaxReport {
       split: s.split,
       proLaboreForAnnexIiiCents: forAnnexIii,
       meLimitRemainingCents: Math.max(0, ME_LIMIT - yearToDate),
+      meLimitCents: ME_LIMIT,
+      eppLimitCents: EPP_LIMIT,
     },
     proLabore: {
       grossCents: gross,

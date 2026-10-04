@@ -400,6 +400,8 @@ export interface RevenueSummary {
   monthCents: number
   /** Months considered from January to the reference month of the same year. */
   yearToDateCents: number
+  /** The year to date plus the average for each remaining month of the year ("no ritmo atual"). */
+  yearProjectionCents: number
   /**
    * 12-month revenue that picks the Simples bracket: the sum of the 12 most recent months when 12
    * or more are considered, otherwise the average × 12 (the rule for new companies).
@@ -465,6 +467,9 @@ export interface SimplesReport {
   proLaboreForAnnexIiiCents: number
   /** Room left under the ME limit (R$ 360 mil) in the reference year. */
   meLimitRemainingCents: number
+  /** Annual limit of the ME (R$ 360 mil) and of the EPP, the ceiling of the Simples Nacional (R$ 4,8 milhões). */
+  meLimitCents: number
+  eppLimitCents: number
 }
 
 export interface ProLaboreReport {
