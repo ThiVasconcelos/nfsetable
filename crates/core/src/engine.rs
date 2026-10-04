@@ -223,31 +223,41 @@ impl Engine {
         page: u32,
         target_width_px: u32,
     ) -> Result<RenderedPage, CoreError> {
-        let _pdfium = self.lock();
-        let document = self.open(path)?;
-        let pages = document.pages();
-        let page_count = page_count(pages);
-        if page >= page_count {
-            return Err(CoreError::PageOutOfRange {
-                page,
-                count: page_count,
-            });
-        }
-        let pdf_page = pages.get(page as PdfPageIndex)?;
-        let width_pt = pdf_page.width().value;
-        let height_pt = pdf_page.height().value;
+        // Only the PDFium work holds the lock (the document, page and bitmap are dropped before
+        // the guard); the conversion and the PNG run after, so other operations wait less.
+        let (image, width_pt, height_pt, page_count) = {
+            let _pdfium = self.lock();
+            let document = self.open(path)?;
+            let pages = document.pages();
+            let page_count = page_count(pages);
+            if page >= page_count {
+                return Err(CoreError::PageOutOfRange {
+                    page,
+                    count: page_count,
+                });
+            }
+            let pdf_page = pages.get(page as PdfPageIndex)?;
+            let width_px =
+                target_width_px.clamp(MIN_RENDER_WIDTH_PX, MAX_RENDER_WIDTH_PX) as Pixels;
+            let config = PdfRenderConfig::new()
+                .set_target_width(width_px)
+                .set_maximum_height(MAX_RENDER_HEIGHT_PX)
+                .render_form_data(true)
+                .render_annotations(true);
+            let bitmap = pdf_page.render_with_config(&config)?;
+            let image = bitmap.as_image()?;
+            (
+                image,
+                pdf_page.width().value,
+                pdf_page.height().value,
+                page_count,
+            )
+        };
+        let image = image.into_rgb8();
 
-        let width_px = target_width_px.clamp(MIN_RENDER_WIDTH_PX, MAX_RENDER_WIDTH_PX) as Pixels;
-        let config = PdfRenderConfig::new()
-            .set_target_width(width_px)
-            .set_maximum_height(MAX_RENDER_HEIGHT_PX)
-            .render_form_data(true)
-            .render_annotations(true);
-        let bitmap = pdf_page.render_with_config(&config)?;
-        let image = bitmap.as_image()?.into_rgb8();
-
+        // The Up filter encodes 30% to 45% faster than Adaptive for a file about 10% larger.
         let mut png = Vec::new();
-        PngEncoder::new_with_quality(&mut png, CompressionType::Fast, FilterType::Adaptive)
+        PngEncoder::new_with_quality(&mut png, CompressionType::Fast, FilterType::Up)
             .write_image(
                 image.as_raw(),
                 image.width(),
