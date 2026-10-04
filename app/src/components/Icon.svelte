@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ICONS, type IconName } from './icons'
+  import type { IconName } from './icons'
 
   interface Props {
     name: IconName
@@ -28,8 +28,8 @@
   aria-hidden={label ? undefined : 'true'}
   focusable="false"
 >
-  <!-- Static markup bundled in icons.ts (never user input). -->
-  {@html ICONS[name]}
+  <!-- The drawing is a <symbol> of IconSprite (mounted once by App). -->
+  <use href="#icon-{name}" />
 </svg>
 
 <style>

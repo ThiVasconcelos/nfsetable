@@ -11,6 +11,7 @@
   import ExcludedDialog from './components/ExcludedDialog.svelte'
   import FilterBar from './components/FilterBar.svelte'
   import Icon from './components/Icon.svelte'
+  import IconSprite from './components/IconSprite.svelte'
   import PreviewPanel from './components/PreviewPanel.svelte'
   import ProfilesDialog from './components/ProfilesDialog.svelte'
   import ProgressBar from './components/ProgressBar.svelte'
@@ -73,6 +74,7 @@
 </script>
 
 <svelte:window bind:innerWidth={windowWidth} />
+<IconSprite />
 
 {#if store.boot === 'loading'}
   <div class="boot" aria-busy="true" aria-label="Carregando"><span class="spinner"></span></div>
