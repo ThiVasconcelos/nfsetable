@@ -211,6 +211,9 @@ export interface RuleTestState {
   saving: boolean
 }
 
+/** One change of the user's edits: the file key, fields to set, fields to drop. */
+type OverrideChange = [key: string, patch: Partial<Override>, remove?: (keyof Override)[]]
+
 const CHUNK_SIZE = 8
 /** While files are read, the table is rebuilt at most this often (once per chunk is O(n²)). */
 const PUBLISH_MS = 200
@@ -426,7 +429,11 @@ export class AppStore {
   sources = $state<Source[]>([])
   exclude = $state<string[]>([...DEFAULT_EXCLUDE])
   theme = $state<ThemeChoice>(loadJSON('theme', 'system', isTheme))
-  overrides = $state<Record<string, Override>>({})
+  /**
+   * The user's edits by file key. Raw state, replaced on every change (never mutated): the table
+   * reads it for every row on every rebuild, and bulk actions change it once.
+   */
+  overrides = $state.raw<Record<string, Override>>({})
   includeDuplicates = $state<boolean>(false)
   /** Duplicate copies hidden by the user (by path; the original document stays listed). */
   hiddenCopies = new SvelteSet<string>()
@@ -1098,10 +1105,19 @@ export class AppStore {
   // ------------------------------------------------------------ overrides (edits)
 
   #patchOverride(hash: string, patch: Partial<Override>, remove: (keyof Override)[] = [], persist = true) {
-    const next: Override = { ...(this.overrides[hash] ?? {}), ...patch }
-    for (const key of remove) delete next[key]
-    if (Object.keys(next).length) this.overrides[hash] = next
-    else delete this.overrides[hash]
+    this.#patchOverrides([[hash, patch, remove]], persist)
+  }
+
+  /** Applies every change in one replacement of the edits (bulk actions on thousands of rows). */
+  #patchOverrides(changes: Iterable<OverrideChange>, persist = true) {
+    const all = { ...this.overrides }
+    for (const [hash, patch, remove = []] of changes) {
+      const next: Override = { ...(all[hash] ?? {}), ...patch }
+      for (const key of remove) delete next[key]
+      if (Object.keys(next).length) all[hash] = next
+      else delete all[hash]
+    }
+    this.overrides = all
     if (persist) this.#saveOverrides()
   }
 
@@ -1130,21 +1146,12 @@ export class AppStore {
     const t = type.trim()
     if (!t || !rows.length) return
     const previous = new Map<string, string | undefined>()
-    for (const row of rows) {
-      if (!previous.has(row.key)) previous.set(row.key, this.overrides[row.key]?.docType)
-      if (t === row.defaultType) this.#patchOverride(row.key, {}, ['docType'], false)
-      else this.#patchOverride(row.key, { docType: t }, [], false)
-    }
-    this.#saveOverrides()
+    for (const row of rows) if (!previous.has(row.key)) previous.set(row.key, this.overrides[row.key]?.docType)
+    this.#patchOverrides(rows.map((row): OverrideChange => (t === row.defaultType ? [row.key, {}, ['docType']] : [row.key, { docType: t }])))
     this.toast(`Tipo “${t}” definido em ${plural(rows.length, 'nota', 'notas')}.`, 'success', {
       label: 'Desfazer',
-      run: () => {
-        for (const [hash, docType] of previous) {
-          if (docType) this.#patchOverride(hash, { docType }, [], false)
-          else this.#patchOverride(hash, {}, ['docType'], false)
-        }
-        this.#saveOverrides()
-      },
+      run: () =>
+        this.#patchOverrides([...previous].map(([hash, docType]): OverrideChange => (docType ? [hash, { docType }] : [hash, {}, ['docType']]))),
     })
   }
 
@@ -1159,12 +1166,8 @@ export class AppStore {
       return
     }
     const previous = new Map<string, DocKind | undefined>()
-    for (const row of list) {
-      if (!previous.has(row.key)) previous.set(row.key, this.overrides[row.key]?.kind)
-      if (kind === row.defaultKind) this.#patchOverride(row.key, {}, ['kind'], false)
-      else this.#patchOverride(row.key, { kind }, [], false)
-    }
-    this.#saveOverrides()
+    for (const row of list) if (!previous.has(row.key)) previous.set(row.key, this.overrides[row.key]?.kind)
+    this.#patchOverrides(list.map((row): OverrideChange => (kind === row.defaultKind ? [row.key, {}, ['kind']] : [row.key, { kind }])))
     const what = kind === 'expense' ? 'despesa' : 'receita'
     const message =
       list.length === 1
@@ -1172,13 +1175,8 @@ export class AppStore {
         : `${plural(list.length, 'nota marcada', 'notas marcadas')} como ${what}.`
     this.toast(message, 'success', {
       label: 'Desfazer',
-      run: () => {
-        for (const [hash, before] of previous) {
-          if (before) this.#patchOverride(hash, { kind: before }, [], false)
-          else this.#patchOverride(hash, {}, ['kind'], false)
-        }
-        this.#saveOverrides()
-      },
+      run: () =>
+        this.#patchOverrides([...previous].map(([hash, before]): OverrideChange => (before ? [hash, { kind: before }] : [hash, {}, ['kind']]))),
     })
   }
 
@@ -1213,13 +1211,14 @@ export class AppStore {
           copies.push(row.path)
         }
       } else if (!this.overrides[row.key]?.removed) {
-        this.#patchOverride(row.key, { removed: true }, [], false)
         hashes.push(row.key)
       }
-      this.selected.delete(row.path)
-      if (this.activePath === row.path) this.closePreview()
     }
-    this.#saveOverrides()
+    this.#patchOverrides(hashes.map((hash): OverrideChange => [hash, { removed: true }]))
+    const removing = new Set(rows.map((r) => r.path))
+    if ([...this.selected].every((path) => removing.has(path))) this.selected.clear()
+    else for (const path of removing) this.selected.delete(path)
+    if (this.activePath && removing.has(this.activePath)) this.closePreview()
     this.#saveHiddenCopies()
     const message =
       rows.length === 1
@@ -1229,20 +1228,18 @@ export class AppStore {
       label: 'Desfazer',
       run: () => {
         for (const path of copies) this.hiddenCopies.delete(path)
-        for (const hash of hashes) this.#patchOverride(hash, {}, ['removed'], false)
-        this.#saveOverrides()
+        this.#patchOverrides(hashes.map((hash): OverrideChange => [hash, {}, ['removed']]))
         this.#saveHiddenCopies()
       },
     })
   }
 
   restoreRemoved() {
-    for (const f of this.scan?.files ?? []) {
-      const key = fileKey(f)
-      if (this.overrides[key]?.removed) this.#patchOverride(key, {}, ['removed'], false)
-      this.hiddenCopies.delete(f.path)
-    }
-    this.#saveOverrides()
+    const files = this.scan?.files ?? []
+    this.#patchOverrides(
+      files.map(fileKey).filter((key) => this.overrides[key]?.removed).map((key): OverrideChange => [key, {}, ['removed']]),
+    )
+    for (const f of files) this.hiddenCopies.delete(f.path)
     this.#saveHiddenCopies()
   }
 
@@ -1450,16 +1447,16 @@ export class AppStore {
     if (!state) return false
     const chosen = new Set(paths)
     const rowByPath = new Map(this.rows.map((r) => [r.path, r]))
-    let applied = 0
+    const changes: OverrideChange[] = []
     for (const t of state.results) {
       if (!chosen.has(t.path) || !t.value || t.value.cents == null) continue
       const row = rowByPath.get(t.path)
       if (!row) continue
       const v = t.value
-      this.#patchOverride(row.key, { cents: v.cents!, origin: 'region', raw: v.raw, page: v.page, bbox: v.bbox }, [], false)
-      applied++
+      changes.push([row.key, { cents: v.cents!, origin: 'region', raw: v.raw, page: v.page, bbox: v.bbox }])
     }
-    this.#saveOverrides()
+    this.#patchOverrides(changes)
+    const applied = changes.length
 
     if (profileName) {
       this.#updateRuleTest(state.seq, { saving: true, error: null })
