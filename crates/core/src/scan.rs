@@ -5,20 +5,46 @@ use crate::text::normalize;
 use sha2::{Digest, Sha256};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
-use std::fs::{self, File};
+use std::fs::{self, File, Metadata};
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
-use walkdir::WalkDir;
+use std::sync::{LazyLock, Mutex, PoisonError};
+use std::time::SystemTime;
+use walkdir::{DirEntry, WalkDir};
+
+/// Size and modification time of a file, as listed (no extra open per file).
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct Stamp {
+    size: u64,
+    modified: SystemTime,
+}
+
+impl Stamp {
+    fn of(metadata: &Metadata) -> Option<Stamp> {
+        Some(Stamp {
+            size: metadata.len(),
+            modified: metadata.modified().ok()?,
+        })
+    }
+}
+
+/// Hashes of the files scanned so far in this process, by path: a rescan does not read a file
+/// again while its size and modification time are the same.
+static KNOWN_HASHES: LazyLock<Mutex<HashMap<PathBuf, (Stamp, String)>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Scans the sources and returns the PDF files found.
 ///
 /// - Only `*.pdf` files (case-insensitive extension) are listed.
 /// - Folders are walked recursively only when `recursive` is set.
-/// - A file reachable from several sources is listed once (canonical paths are deduplicated).
+/// - A file reachable from several sources is listed once (each source folder is canonicalized
+///   and the files below it take its form, so the same file gets the same path).
 /// - Files whose NAME contains one of `exclude` (case- and accent-insensitive) go to `excluded`.
 /// - Files are sorted by folder, then by file name without extension (so "nota.pdf" comes before
 ///   "nota (1).pdf"); byte-identical files get `duplicate_of` = path of the first one.
 /// - Unreadable folders or files never abort the scan.
+/// - Hashes are remembered for the process (see `KNOWN_HASHES`), so a rescan of unchanged files
+///   only lists the folders.
 pub fn scan(options: &ScanOptions) -> ScanResult {
     let mut collector = Collector::new(&options.exclude);
     let mut sources = Vec::with_capacity(options.sources.len());
@@ -32,16 +58,29 @@ pub fn scan(options: &ScanOptions) -> ScanResult {
 
         if is_dir {
             let max_depth = if source.recursive { usize::MAX } else { 1 };
+            let base = display_path(&root);
             let walker = WalkDir::new(&root).min_depth(1).max_depth(max_depth);
             // Entries that fail (e.g. permission denied on a subfolder) are skipped.
             for entry in walker.into_iter().filter_map(Result::ok) {
-                let path = entry.path();
-                if path.is_file() && collector.visit(path) {
+                if !is_pdf(entry.path()) {
+                    continue;
+                }
+                let Some(stamp) = listed_file(&entry) else {
+                    continue;
+                };
+                let path = match entry.path().strip_prefix(&root) {
+                    Ok(relative) => base.join(relative),
+                    Err(_) => display_path(entry.path()),
+                };
+                if collector.visit(path, stamp) {
                     file_count += 1;
                 }
             }
-        } else if exists && collector.visit(&root) {
-            file_count += 1;
+        } else if exists && is_pdf(&root) {
+            let stamp = metadata.as_ref().and_then(Stamp::of);
+            if collector.visit(display_path(&root), stamp) {
+                file_count += 1;
+            }
         }
 
         sources.push(SourceInfo {
@@ -53,15 +92,15 @@ pub fn scan(options: &ScanOptions) -> ScanResult {
     }
 
     let (mut found, mut excluded) = (collector.found, collector.excluded);
-    found.sort_by_cached_key(|path| sort_key(path));
+    found.sort_by_cached_key(|(path, _)| sort_key(path));
     excluded.sort_by_cached_key(|path| sort_key(path));
 
     let mut first_by_hash: HashMap<String, String> = HashMap::new();
     let files = found
         .into_iter()
-        .map(|path| {
+        .map(|(path, stamp)| {
             let path_str = path_to_string(&path);
-            let hash = hash_file(&path).unwrap_or_default();
+            let hash = known_hash(&path, stamp);
             let duplicate_of = if hash.is_empty() {
                 None
             } else {
@@ -76,7 +115,7 @@ pub fn scan(options: &ScanOptions) -> ScanResult {
             ScannedFile {
                 name: file_name(&path),
                 dir: path.parent().map(path_to_string).unwrap_or_default(),
-                size: fs::metadata(&path).map(|m| m.len()).unwrap_or(0),
+                size: stamp.map_or(0, |s| s.size),
                 path: path_str,
                 hash,
                 duplicate_of,
@@ -95,7 +134,7 @@ struct Collector {
     exclude: Vec<String>,
     seen: HashSet<PathBuf>,
     seen_excluded: HashSet<PathBuf>,
-    found: Vec<PathBuf>,
+    found: Vec<(PathBuf, Option<Stamp>)>,
     excluded: Vec<PathBuf>,
 }
 
@@ -114,13 +153,9 @@ impl Collector {
         }
     }
 
-    /// Records a candidate file. Returns true when it is a PDF that passed the exclude filter
-    /// (even if another source already listed it).
-    fn visit(&mut self, path: &Path) -> bool {
-        if !is_pdf(path) {
-            return false;
-        }
-        let path = display_path(path);
+    /// Records a PDF at its display path. Returns true when it passed the exclude filter (even
+    /// if another source already listed it).
+    fn visit(&mut self, path: PathBuf, stamp: Option<Stamp>) -> bool {
         if self.is_excluded(&path) {
             if self.seen_excluded.insert(path.clone()) {
                 self.excluded.push(path);
@@ -128,7 +163,7 @@ impl Collector {
             return false;
         }
         if self.seen.insert(path.clone()) {
-            self.found.push(path);
+            self.found.push((path, stamp));
         }
         true
     }
@@ -151,6 +186,36 @@ fn sort_key(path: &Path) -> (PathBuf, String, PathBuf) {
             .unwrap_or_default(),
         path.to_path_buf(),
     )
+}
+
+/// The stamp of a listed regular file (a symlink counts when it points to one), `None` for
+/// folders and anything else. Uses what the directory listing already knows where it can.
+fn listed_file(entry: &DirEntry) -> Option<Option<Stamp>> {
+    let kind = entry.file_type();
+    if kind.is_symlink() {
+        let metadata = fs::metadata(entry.path()).ok()?;
+        return metadata.is_file().then(|| Stamp::of(&metadata));
+    }
+    kind.is_file()
+        .then(|| entry.metadata().ok().as_ref().and_then(Stamp::of))
+}
+
+/// The SHA-256 of `path`, reused from an earlier scan while its stamp is the same; empty when it
+/// cannot be read (and then not remembered, so the next scan tries again).
+fn known_hash(path: &Path, stamp: Option<Stamp>) -> String {
+    let mut known = KNOWN_HASHES.lock().unwrap_or_else(PoisonError::into_inner);
+    if let (Some(stamp), Some((seen, hash))) = (stamp, known.get(path)) {
+        if *seen == stamp {
+            return hash.clone();
+        }
+    }
+    drop(known);
+    let hash = hash_file(path).unwrap_or_default();
+    if let (Some(stamp), false) = (stamp, hash.is_empty()) {
+        known = KNOWN_HASHES.lock().unwrap_or_else(PoisonError::into_inner);
+        known.insert(path.to_path_buf(), (stamp, hash.clone()));
+    }
+    hash
 }
 
 fn is_pdf(path: &Path) -> bool {
@@ -217,4 +282,74 @@ fn hash_file(path: &Path) -> io::Result<String> {
         hasher.update(&buffer[..read]);
     }
     Ok(format!("{:x}", hasher.finalize()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::Source;
+    use std::time::Duration;
+
+    fn scan_dir(dir: &Path) -> ScanResult {
+        scan(&ScanOptions {
+            sources: vec![Source {
+                path: dir.to_string_lossy().into_owned(),
+                recursive: true,
+            }],
+            exclude: vec![],
+        })
+    }
+
+    #[test]
+    fn unchanged_files_are_not_read_again() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("nota.pdf");
+        fs::write(&path, b"%PDF-1.4 conteudo A").unwrap();
+        let file = File::options().write(true).open(&path).unwrap();
+        let stamp = SystemTime::UNIX_EPOCH + Duration::from_secs(1_790_000_000);
+        file.set_modified(stamp).unwrap();
+        let first = scan_dir(dir.path()).files[0].hash.clone();
+
+        // Same size and modification time: the remembered hash is used (the file is not read).
+        fs::write(&path, b"%PDF-1.4 conteudo B").unwrap();
+        File::options()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_modified(stamp)
+            .unwrap();
+        assert_eq!(scan_dir(dir.path()).files[0].hash, first);
+
+        // A new modification time: read again.
+        File::options()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_modified(stamp + Duration::from_secs(60))
+            .unwrap();
+        let again = scan_dir(dir.path()).files[0].hash.clone();
+        assert_ne!(again, first);
+        assert_eq!(
+            again,
+            format!("{:x}", Sha256::digest(b"%PDF-1.4 conteudo B"))
+        );
+    }
+
+    #[test]
+    fn lists_only_pdf_files() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("nota.PDF"), b"%PDF").unwrap();
+        fs::write(dir.path().join("planilha.xlsx"), b"x").unwrap();
+        fs::create_dir(dir.path().join("pasta.pdf")).unwrap();
+        fs::write(
+            dir.path().join("pasta.pdf").join("dentro.pdf"),
+            b"%PDF dentro",
+        )
+        .unwrap();
+        let result = scan_dir(dir.path());
+        let names: Vec<&str> = result.files.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(names, vec!["nota.PDF", "dentro.pdf"]);
+        assert_eq!(result.files[0].size, 4);
+        assert_eq!(result.sources[0].file_count, 2);
+    }
 }
