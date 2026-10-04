@@ -212,6 +212,8 @@ export interface RuleTestState {
 }
 
 const CHUNK_SIZE = 8
+/** While files are read, the table is rebuilt at most this often (once per chunk is O(n²)). */
+const PUBLISH_MS = 200
 const DEFAULT_EXCLUDE = ['cancelada']
 /** Types offered by the type editor. "Bônus" notes count as revenue like any other. */
 export const BASE_TYPES = ['NFS-e', 'PDF', 'Cancelada', 'Bônus']
@@ -348,8 +350,16 @@ function legacyNotes(): NotesDoc | null {
 }
 
 /** "Cancelada" (any case/accents) marks a cancelled note, which never counts towards the total. */
+const cancelledTypes = new Map<string, boolean>()
+
+/** Typed as a cancelled note (remembered: the table asks for every row on every rebuild). */
 export function isCancelledType(type: string): boolean {
-  return normalizeText(type).startsWith('cancelad')
+  let cancelled = cancelledTypes.get(type)
+  if (cancelled === undefined) {
+    cancelled = normalizeText(type).startsWith('cancelad')
+    cancelledTypes.set(type, cancelled)
+  }
+  return cancelled
 }
 
 /** "Bônus" (any case/accents): revenue that "sobra do mês" can leave out of its base. */
@@ -357,8 +367,9 @@ export function isBonusType(type: string): boolean {
   return normalizeText(type).startsWith('bonus')
 }
 
-function defaultTypeFor(name: string, result: DocResult | null): string {
-  if (normalizeText(name).includes('cancelad')) return 'Cancelada'
+/** `nameKey`: the normalized file name. */
+function defaultTypeFor(nameKey: string, result: DocResult | null): string {
+  if (nameKey.includes('cancelad')) return 'Cancelada'
   return result?.docType ?? ''
 }
 
@@ -485,6 +496,9 @@ export class AppStore {
   #anchor: string | null = null
 
   // ------------------------------------------------------------ derived state
+
+  /** Normalized file names, once per scan (not once per row on every rebuild). */
+  #nameKeys = $derived.by(() => new Map((this.scan?.files ?? []).map((f) => [f.path, normalizeText(f.name)])))
 
   rows = $derived.by(() => this.#buildRows())
 
@@ -907,18 +921,31 @@ export class AppStore {
     this.phase = 'extracting'
     this.progress = { done: 0, total: todo.length, run: 0 }
     const fileByPath = new Map(scan.files.map((f) => [f.path, f]))
-    for (let i = 0; i < todo.length; i += CHUNK_SIZE) {
-      if (this.#dirty) return
-      const chunk = todo.slice(i, i + CHUNK_SIZE)
-      this.#chunkBase = i
+    type Pending = { start: number; chunk: string[]; docs: Promise<DocResult[]> }
+    const request = (start: number): Pending => {
+      const chunk = todo.slice(start, start + CHUNK_SIZE)
+      const keys = chunk.map((path) => {
+        const f = fileByPath.get(path)
+        return f ? cacheKey(f) : ''
+      })
+      this.#chunkBase = start
+      return { start, chunk, docs: api.extractDocuments(chunk, keys) }
+    }
+    let working = { ...this.results }
+    let lastPublish = performance.now()
+    const publish = () => {
+      fillDuplicates(scan.files, working)
+      this.results = working
+      working = { ...working }
+      lastPublish = performance.now()
+    }
+    let inflight: Pending | null = request(0)
+    while (inflight) {
+      const { start, chunk }: Pending = inflight
       let docs: DocResult[]
       let failed = false
       try {
-        const keys = chunk.map((path) => {
-          const f = fileByPath.get(path)
-          return f ? cacheKey(f) : ''
-        })
-        docs = await api.extractDocuments(chunk, keys)
+        docs = await inflight.docs
       } catch (e) {
         failed = true
         const message = errorMessage(e)
@@ -928,20 +955,23 @@ export class AppStore {
       // The profiles changed while this chunk was read: its results are stale, and the run that
       // forgetCache() scheduled (if any) reads these files again.
       if (generation !== this.#generation) return
-      const next = { ...this.results }
+      // The backend reads the next chunk while the table is updated.
+      const next: number = start + CHUNK_SIZE
+      inflight = next < todo.length && !this.#dirty ? request(next) : null
       docs.forEach((doc, k) => {
         // Trust the order of the answer; fall back to the returned path.
         const path = docs.length === chunk.length ? chunk[k] : doc.path
         const result = doc.path === path ? doc : { ...doc, path }
-        next[path] = result
+        working[path] = result
         const file = fileByPath.get(path)
         const key = file ? cacheKey(file) : ''
         if (key && !failed) this.#cache.set(key, result)
       })
-      fillDuplicates(scan.files, next)
-      this.results = next
-      this.progress = { done: Math.min(todo.length, i + chunk.length), total: todo.length, run: 0 }
+      const done = Math.max(this.progress.done, Math.min(todo.length, start + chunk.length))
+      this.progress = { done, total: todo.length, run: 0 }
+      if (!inflight || performance.now() - lastPublish >= PUBLISH_MS) publish()
     }
+    if (this.#dirty) return
     // Next time the app opens, these files are not read again.
     void api.saveCachedResults().catch(() => {})
   }
@@ -959,8 +989,10 @@ export class AppStore {
     const scan = this.scan
     if (!scan) return []
     const nameByPath = new Map(scan.files.map((f) => [f.path, f.name]))
+    const nameKeys = this.#nameKeys
     const rows: Row[] = []
     for (const f of scan.files) {
+      const nameKey = nameKeys.get(f.path) ?? normalizeText(f.name)
       const key = fileKey(f)
       const o = this.overrides[key]
       if (o?.removed || (f.duplicateOf && this.hiddenCopies.has(f.path))) continue
@@ -979,7 +1011,7 @@ export class AppStore {
         highlight = { page: extracted.page, bbox: extracted.bbox }
       }
 
-      const defaultType = defaultTypeFor(f.name, result)
+      const defaultType = defaultTypeFor(nameKey, result)
       const typeEdited = !!o?.docType && o.docType !== defaultType
       const docType = typeEdited ? o!.docType! : defaultType
       const cancelled = isCancelledType(docType)
@@ -1004,7 +1036,7 @@ export class AppStore {
         name: f.name,
         dir: f.dir,
         key,
-        searchKey: normalizeText(f.name),
+        searchKey: nameKey,
         duplicateOf: f.duplicateOf,
         duplicateName: f.duplicateOf ? (nameByPath.get(f.duplicateOf) ?? baseName(f.duplicateOf)) : null,
         result,
