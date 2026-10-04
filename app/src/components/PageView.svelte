@@ -1,14 +1,27 @@
 <script module lang="ts">
   import type { RenderedPage } from '../lib/types'
 
-  // Small in-memory cache of rendered pages (data URLs), most recent last.
+  // Small in-memory cache of rendered pages (data URLs), most recent last, bounded by count and by
+  // size (a page rendered at a high zoom is hundreds of kilobytes).
   const cache = new Map<string, RenderedPage>()
   const CACHE_LIMIT = 24
+  const CACHE_CHARS = 6_000_000
+  let cachedChars = 0
 
   function remember(key: string, page: RenderedPage) {
-    cache.delete(key)
+    forget(key)
     cache.set(key, page)
-    while (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value as string)
+    cachedChars += page.dataUrl.length
+    while (cache.size > 1 && (cache.size > CACHE_LIMIT || cachedChars > CACHE_CHARS)) {
+      forget(cache.keys().next().value as string)
+    }
+  }
+
+  function forget(key: string) {
+    const old = cache.get(key)
+    if (!old) return
+    cache.delete(key)
+    cachedChars -= old.dataUrl.length
   }
 
   // The preview is rebuilt for every row the keyboard passes over. A request that comes soon after
