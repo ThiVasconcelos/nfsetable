@@ -553,9 +553,13 @@ export class AppStore {
    */
   visibleRows = $derived.by(() => {
     const q = normalizeText(this.search)
+    return this.#sortedBase.filter((r) => this.#matchesFilter(r, this.filter) && (!q || r.searchKey.includes(q)))
+  })
+
+  /** The rows the table filters, in the current sort: sorted once, not on every search keystroke. */
+  #sortedBase = $derived.by(() => {
     const base = this.filter === 'noCompetence' ? this.rows : this.kindRows
-    const list = base.filter((r) => this.#matchesFilter(r, this.filter) && (!q || r.searchKey.includes(q)))
-    return this.sort ? sortRows(list, this.sort) : list
+    return this.sort ? sortRows(base, this.sort) : base
   })
 
   /** Selected rows (in table order, including rows hidden by the filter). */
