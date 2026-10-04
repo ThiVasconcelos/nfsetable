@@ -247,3 +247,5 @@ patterns nobody can review.
 - Keep `model.rs`/`types.ts` and the engine/mock pairs in sync.
 - Update README.md and README.pt-BR.md when behavior changes.
 - Read your diff for personal data before handing it over.
+- Commit messages follow Conventional Commits (`fix: ...`, `feat: ...`, `docs: ...`; types and
+  format in CONTRIBUTING.md).

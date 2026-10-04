@@ -88,6 +88,11 @@ npm run build
 - **PDFium is not thread-safe:** code that uses `Engine::pdfium()` directly must hold
   `Engine::lock()`.
 - **Everything local:** no network calls, telemetry or resources loaded from a CDN.
+- **Commit messages** follow [Conventional Commits](https://www.conventionalcommits.org/):
+  `type: summary`, in English, imperative and lowercase, up to about 60 characters, one commit
+  per change (e.g. `fix: keep edits made while a save is running`). Types: `feat` (new
+  behavior), `fix` (bug fix), `perf`, `refactor`, `test`, `docs`, `build`, `ci` and `chore`
+  (versions, releases, upkeep).
 
 ## Adding a built-in profile
 
