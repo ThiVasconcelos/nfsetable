@@ -71,8 +71,8 @@ It runs on Windows, Linux and macOS and is built with Tauri 2, Rust, PDFium and 
   choose month by month whether the invoices' total or the forecast counts. It works even with no
   invoice loaded.
 - **Month by month in the Resumo** (summary): a small table with each month's revenue, taxes,
-  expenses and profit; for an ME also the operating profit (revenue − taxes − expenses, before the
-  pró-labore) and the pró-labore.
+  expenses and profit; for an ME also the INSS and IRRF withheld from the pró-labore, the operating
+  profit (revenue − taxes − INSS and IRRF − expenses) and the net pró-labore.
 - **MEI** (Microempreendedor Individual, the regime for individual micro-entrepreneurs, with a
   fixed monthly tax): the year's revenue limit, a projection at the current pace and the DAS-MEI,
   the monthly tax slip. The MEI has no pró-labore, so none is shown.

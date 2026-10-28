@@ -54,7 +54,8 @@ Aponte a pasta das notas, confira os valores e veja o total da seleção. Tudo r
 - **Projeção**: digite quanto espera receber em qualquer mês, mesmo sem nota, e escolha mês a mês
   se vale o total das notas ou o previsto. Funciona até sem nenhuma nota carregada.
 - **Mês a mês no Resumo**: uma tabelinha com receita, impostos, gastos e lucro de cada mês; na ME
-  também o lucro operacional (receita − impostos − gastos, antes do pró-labore) e o pró-labore.
+  também o INSS e o IRRF do pró-labore, o lucro operacional (receita − impostos − INSS e IRRF −
+  gastos) e o pró-labore líquido.
 - **MEI**: limite do ano, projeção no ritmo atual e DAS-MEI. No MEI não existe pró-labore, então
   ele não aparece em lugar nenhum.
 - **Simples Nacional (ME/EPP)**: Fator R, anexo (III ou V), faixa, alíquota efetiva, DAS e repartição.

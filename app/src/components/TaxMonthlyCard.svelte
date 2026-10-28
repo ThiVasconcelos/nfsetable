@@ -1,8 +1,9 @@
 <script lang="ts">
   // "Receita, gastos e lucro": a small table of the months considered (report.cashFlow) on the
-  // Resumo, for a sense of the company's health: revenue, taxes, costs (fixed + variable), the
-  // operating profit and the gross pró-labore (not in the MEI) and what the company earned. The
-  // full detail (reserve, leftover) is in "Fluxo mês a mês".
+  // Resumo, for a sense of the company's health: revenue, taxes, costs (fixed + variable) and what
+  // the company earned; outside the MEI also the INSS and IRRF of the pró-labore (taxes too), the
+  // operating profit and the net pró-labore, so every column is subtracted once. The full detail
+  // (reserve, leftover) is in "Fluxo mês a mês".
   import { formatAmount, formatBRL, formatMonthLong, formatMonthShort, formatPercent, plural } from '../lib/format'
   import type { CashFlowMonth, TaxRegime } from '../lib/types'
   import TaxCard from './TaxCard.svelte'
@@ -18,17 +19,23 @@
 
   const mei = $derived(regime === 'mei')
 
-  /** Lucro operacional: revenue − taxes − costs, what the company made before the pró-labore. */
-  const operating = (m: CashFlowMonth) => m.profitCents + m.proLaboreCents
+  /** What the partner receives: the gross pró-labore less the INSS and IRRF withheld from it. */
+  const netProLabore = (m: CashFlowMonth) => m.proLaboreCents - m.ownerTaxesCents
+  /**
+   * Lucro operacional: revenue − taxes − INSS and IRRF − costs, what is left for the net pró-labore
+   * and the profit (the profit already pays the gross pró-labore, INSS and IRRF included).
+   */
+  const operating = (m: CashFlowMonth) => m.profitCents + netProLabore(m)
 
   const totals = $derived.by(() => {
-    const t = { revenue: 0, taxes: 0, costs: 0, operating: 0, proLabore: 0, profit: 0 }
+    const t = { revenue: 0, taxes: 0, ownerTaxes: 0, costs: 0, operating: 0, proLabore: 0, profit: 0 }
     for (const m of flow) {
       t.revenue += m.revenueCents
       t.taxes += m.companyTaxesCents
+      t.ownerTaxes += m.ownerTaxesCents
       t.costs += m.fixedCostsCents + m.variableCostsCents
       t.operating += operating(m)
-      t.proLabore += m.proLaboreCents
+      t.proLabore += netProLabore(m)
       t.profit += m.profitCents
     }
     return t
@@ -55,7 +62,7 @@
       Lucro operacional de
       <strong class="num" class:negative={totals.operating < 0}>{formatBRL(totals.operating)}</strong> em
       {plural(flow.length, 'mês', 'meses')}{#if margin != null}, <span class="num">{formatPercent(margin)}</span> da receita{/if};
-      depois do pró-labore, lucro de
+      depois do pró-labore líquido, lucro de
       <strong class="num" class:negative={totals.profit < 0}>{formatBRL(totals.profit)}</strong>.
     {/if}
     {#if losses}
@@ -67,19 +74,28 @@
   </p>
 
   <div class="wrap">
-    <table>
+    <table class:me={!mei}>
       <caption class="sr-only">Receita, gastos e lucro de cada mês, valores em reais</caption>
       <thead>
         <tr>
           <th scope="col" class="c-month">Mês</th>
           <th scope="col" class="c-num">Receita</th>
           <th scope="col" class="c-num" title="Impostos da empresa sobre a receita do mês">Impostos</th>
+          {#if !mei}
+            <th scope="col" class="c-num" title="INSS e IRRF retidos do pró-labore do mês">INSS + IRRF</th>
+          {/if}
           <th scope="col" class="c-num" title="Custos fixos e gastos variáveis do mês">Gastos</th>
           {#if !mei}
-            <th scope="col" class="c-num" title="Receita − impostos − gastos: o que a empresa gerou antes do pró-labore (lucro + pró-labore)">
+            <th
+              scope="col"
+              class="c-num"
+              title="Receita − impostos − INSS e IRRF − gastos: o que sobra para o pró-labore líquido e o lucro"
+            >
               Lucro operacional
             </th>
-            <th scope="col" class="c-num" title="Pró-labore bruto do mês">Pró-labore</th>
+            <th scope="col" class="c-num" title="Pró-labore do mês sem o INSS e o IRRF: o que o sócio recebe">
+              Pró-labore líquido
+            </th>
           {/if}
           <th scope="col" class="c-num" title="O que a empresa ganhou no mês">Lucro</th>
         </tr>
@@ -97,10 +113,11 @@
             </th>
             <td class="c-num num">{formatAmount(m.revenueCents)}</td>
             <td class="c-num num">{formatAmount(m.companyTaxesCents)}</td>
+            {#if !mei}<td class="c-num num">{formatAmount(m.ownerTaxesCents)}</td>{/if}
             <td class="c-num num">{formatAmount(m.fixedCostsCents + m.variableCostsCents)}</td>
             {#if !mei}
               <td class="c-num num operating" class:negative={operating(m) < 0}>{formatAmount(operating(m))}</td>
-              <td class="c-num num">{formatAmount(m.proLaboreCents)}</td>
+              <td class="c-num num">{formatAmount(netProLabore(m))}</td>
             {/if}
             <td class="c-num num profit" class:negative={m.profitCents < 0}>{formatAmount(m.profitCents)}</td>
           </tr>
@@ -111,6 +128,7 @@
           <th scope="row" class="c-month">Total</th>
           <td class="c-num num">{formatAmount(totals.revenue)}</td>
           <td class="c-num num">{formatAmount(totals.taxes)}</td>
+          {#if !mei}<td class="c-num num">{formatAmount(totals.ownerTaxes)}</td>{/if}
           <td class="c-num num">{formatAmount(totals.costs)}</td>
           {#if !mei}
             <td class="c-num num operating" class:negative={totals.operating < 0}>{formatAmount(totals.operating)}</td>
@@ -127,7 +145,8 @@
       {#if mei}
         Lucro = receita − impostos − gastos. Valores em R$.
       {:else}
-        Lucro operacional = receita − impostos − gastos; lucro = lucro operacional − pró-labore. Valores em R$.
+        Lucro operacional = receita − impostos − INSS e IRRF − gastos; lucro = lucro operacional − pró-labore
+        líquido. Valores em R$.
       {/if}
     </span>
     <button type="button" class="link" onclick={onflow}>Ver o fluxo completo (reserva e sobra)</button>
@@ -166,6 +185,11 @@
     border-collapse: separate;
     border-spacing: 0;
     font-size: 12.5px;
+  }
+
+  /* Two more columns outside the MEI (INSS + IRRF, pró-labore). */
+  table.me {
+    min-width: 720px;
   }
 
   th,
