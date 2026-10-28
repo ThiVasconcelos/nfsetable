@@ -44,15 +44,20 @@ static KNOWN_HASHES: LazyLock<Mutex<HashMap<PathBuf, (Stamp, String)>>> =
 ///   and the files below it take its form, so the same file gets the same path).
 /// - Files whose NAME contains one of `exclude` (case- and accent-insensitive) go to `excluded`.
 /// - Files are sorted by folder, then by file name without extension (so "nota.pdf" comes before
-///   "nota (1).pdf"); byte-identical files get `duplicate_of` = path of the first one.
+///   "nota (1).pdf"); byte-identical files get `duplicate_of` = path of the first one (see
+///   `mark_duplicates`).
 /// - Unreadable folders or files never abort the scan.
 /// - Hashes are remembered for the process (see `KNOWN_HASHES`), so a rescan of unchanged files
 ///   only lists the folders.
+/// - A source that cannot be reached lists its files of `known` again, unavailable, and a file
+///   that cannot be read takes its hash of `known` while its size is the same (see
+///   [`ScanOptions::known`]).
 pub fn scan(options: &ScanOptions) -> ScanResult {
     let mut collector = Collector::new(&options.exclude);
     let mut sources = Vec::with_capacity(options.sources.len());
+    let mut unreachable = Vec::new();
 
-    for source in &options.sources {
+    for (index, source) in options.sources.iter().enumerate() {
         let root = PathBuf::from(&source.path);
         let metadata = fs::metadata(&root).ok();
         let exists = metadata.is_some();
@@ -60,7 +65,9 @@ pub fn scan(options: &ScanOptions) -> ScanResult {
         let mut file_count = 0u32;
         let mut unreadable = Vec::new();
 
-        if is_dir {
+        if !exists {
+            unreachable.push(index);
+        } else if is_dir {
             let max_depth = if source.recursive { usize::MAX } else { 1 };
             let base = display_path(&root);
             let walker = WalkDir::new(&root).min_depth(1).max_depth(max_depth);
@@ -86,13 +93,13 @@ pub fn scan(options: &ScanOptions) -> ScanResult {
                     Ok(relative) => base.join(relative),
                     Err(_) => display_path(entry.path()),
                 };
-                if collector.visit(path, stamp) {
+                if collector.visit(path, Listed::Now(stamp), index) {
                     file_count += 1;
                 }
             }
-        } else if exists && is_pdf(&root) {
+        } else if is_pdf(&root) {
             let stamp = metadata.as_ref().and_then(Stamp::of);
-            if collector.visit(display_path(&root), stamp) {
+            if collector.visit(display_path(&root), Listed::Now(stamp), index) {
                 file_count += 1;
             }
         }
@@ -106,37 +113,63 @@ pub fn scan(options: &ScanOptions) -> ScanResult {
         });
     }
 
+    // After every reachable source, so a file still reachable from one of them is listed as it is
+    // now, not as it was.
+    for index in unreachable {
+        let source = &options.sources[index].path;
+        for file in options.known.iter().filter(|f| &f.source == source) {
+            let earlier = Listed::Earlier {
+                hash: file.hash.clone(),
+                size: file.size,
+            };
+            collector.visit(PathBuf::from(&file.path), earlier, index);
+        }
+    }
+
     let (mut found, mut excluded) = (collector.found, collector.excluded);
-    found.sort_by_cached_key(|(path, _)| sort_key(path));
+    found.sort_by_cached_key(|f| sort_key(&f.path));
     excluded.sort_by_cached_key(|path| sort_key(path));
 
-    let mut first_by_hash: HashMap<String, String> = HashMap::new();
-    let files = found
+    let known: HashMap<&str, &ScannedFile> = options
+        .known
+        .iter()
+        .filter(|f| !f.hash.is_empty())
+        .map(|f| (f.path.as_str(), f))
+        .collect();
+    let mut files: Vec<ScannedFile> = found
         .into_iter()
-        .map(|(path, stamp)| {
-            let path_str = path_to_string(&path);
-            let hash = known_hash(&path, stamp);
-            let duplicate_of = if hash.is_empty() {
-                None
-            } else {
-                match first_by_hash.entry(hash.clone()) {
-                    Entry::Occupied(first) => Some(first.get().clone()),
-                    Entry::Vacant(slot) => {
-                        slot.insert(path_str.clone());
-                        None
+        .map(|found| {
+            let path = path_to_string(&found.path);
+            let (hash, size, available) = match found.listed {
+                Listed::Earlier { hash, size } => (hash, size, false),
+                Listed::Now(stamp) => {
+                    let hash = known_hash(&found.path, stamp);
+                    let size = stamp.map_or(0, |s| s.size);
+                    if !hash.is_empty() {
+                        (hash, size, true)
+                    } else {
+                        // Not readable now: the content of an earlier scan, if it looks the same.
+                        let earlier = known
+                            .get(path.as_str())
+                            .filter(|k| stamp.is_some() && k.size == size)
+                            .map(|k| k.hash.clone());
+                        (earlier.unwrap_or_default(), size, false)
                     }
                 }
             };
             ScannedFile {
-                name: file_name(&path),
-                dir: path.parent().map(path_to_string).unwrap_or_default(),
-                size: stamp.map_or(0, |s| s.size),
-                path: path_str,
+                name: file_name(&found.path),
+                dir: found.path.parent().map(path_to_string).unwrap_or_default(),
+                size,
+                path,
                 hash,
-                duplicate_of,
+                duplicate_of: None,
+                source: options.sources[found.source].path.clone(),
+                available,
             }
         })
         .collect();
+    mark_duplicates(&mut files);
 
     ScanResult {
         sources,
@@ -145,11 +178,26 @@ pub fn scan(options: &ScanOptions) -> ScanResult {
     }
 }
 
+/// How a file came into the scan.
+enum Listed {
+    /// Listed from its folder now (its stamp, when known).
+    Now(Option<Stamp>),
+    /// A file of an earlier scan whose source cannot be reached: its hash and size back then.
+    Earlier { hash: String, size: u64 },
+}
+
+/// A PDF of the scan: its display path, how it came in and the source (index) that listed it.
+struct Found {
+    path: PathBuf,
+    listed: Listed,
+    source: usize,
+}
+
 struct Collector {
     exclude: Vec<String>,
     seen: HashSet<PathBuf>,
     seen_excluded: HashSet<PathBuf>,
-    found: Vec<(PathBuf, Option<Stamp>)>,
+    found: Vec<Found>,
     excluded: Vec<PathBuf>,
 }
 
@@ -168,9 +216,9 @@ impl Collector {
         }
     }
 
-    /// Records a PDF at its display path. Returns true when it passed the exclude filter (even
-    /// if another source already listed it).
-    fn visit(&mut self, path: PathBuf, stamp: Option<Stamp>) -> bool {
+    /// Records a PDF at its display path, listed by source `source`. Returns true when it passed
+    /// the exclude filter (even if another source already listed it).
+    fn visit(&mut self, path: PathBuf, listed: Listed, source: usize) -> bool {
         if self.is_excluded(&path) {
             if self.seen_excluded.insert(path.clone()) {
                 self.excluded.push(path);
@@ -178,7 +226,11 @@ impl Collector {
             return false;
         }
         if self.seen.insert(path.clone()) {
-            self.found.push((path, stamp));
+            self.found.push(Found {
+                path,
+                listed,
+                source,
+            });
         }
         true
     }
@@ -189,6 +241,25 @@ impl Collector {
         }
         let name = normalize(&file_name(path));
         self.exclude.iter().any(|e| name.contains(e.as_str()))
+    }
+}
+
+/// Byte-identical files get `duplicate_of` = path of the first one in scan order, among the files
+/// the scan could read first: a copy that can be reached is the original of one that cannot.
+fn mark_duplicates(files: &mut [ScannedFile]) {
+    let mut first_by_hash: HashMap<String, String> = HashMap::new();
+    for available in [true, false] {
+        let group = files
+            .iter_mut()
+            .filter(|f| f.available == available && !f.hash.is_empty());
+        for file in group {
+            match first_by_hash.entry(file.hash.clone()) {
+                Entry::Occupied(first) => file.duplicate_of = Some(first.get().clone()),
+                Entry::Vacant(slot) => {
+                    slot.insert(file.path.clone());
+                }
+            }
+        }
     }
 }
 
@@ -305,14 +376,155 @@ mod tests {
     use crate::model::Source;
     use std::time::Duration;
 
-    fn scan_dir(dir: &Path) -> ScanResult {
-        scan(&ScanOptions {
+    fn options(dir: &Path, known: Vec<ScannedFile>) -> ScanOptions {
+        ScanOptions {
             sources: vec![Source {
                 path: dir.to_string_lossy().into_owned(),
                 recursive: true,
             }],
             exclude: vec![],
-        })
+            known,
+        }
+    }
+
+    fn scan_dir(dir: &Path) -> ScanResult {
+        scan(&options(dir, vec![]))
+    }
+
+    /// Keeps `path` from being read while the guard lives; None where that cannot be done.
+    #[cfg(windows)]
+    fn lock(path: &Path) -> Option<File> {
+        use std::os::windows::fs::OpenOptionsExt;
+        File::options().read(true).share_mode(0).open(path).ok()
+    }
+
+    #[cfg(unix)]
+    struct Locked(PathBuf);
+
+    #[cfg(unix)]
+    impl Drop for Locked {
+        fn drop(&mut self) {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = fs::set_permissions(&self.0, fs::Permissions::from_mode(0o644));
+        }
+    }
+
+    #[cfg(unix)]
+    fn lock(path: &Path) -> Option<Locked> {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o000)).ok()?;
+        let locked = Locked(path.to_path_buf());
+        // Running as root: permissions are not enforced.
+        File::open(path).is_err().then_some(locked)
+    }
+
+    #[test]
+    fn a_source_out_of_reach_lists_its_known_files() {
+        let root = tempfile::tempdir().unwrap();
+        let notes = root.path().join("notas");
+        fs::create_dir(&notes).unwrap();
+        fs::write(notes.join("a.pdf"), b"%PDF a").unwrap();
+        fs::write(notes.join("b.pdf"), b"%PDF b").unwrap();
+        fs::write(notes.join("b-copia.pdf"), b"%PDF b").unwrap();
+        let before = scan_dir(&notes);
+        let source = notes.to_string_lossy();
+        assert!(before
+            .files
+            .iter()
+            .all(|f| f.available && f.source == source));
+        assert!(
+            before.files[2].duplicate_of.is_some(),
+            "b-copia is a copy of b"
+        );
+
+        // The folder is gone (moved, or on a drive that was disconnected).
+        fs::rename(&notes, root.path().join("movida")).unwrap();
+        // A file another source listed is not this source's.
+        let mut known = before.files.clone();
+        known.push(ScannedFile {
+            path: path_to_string(&notes.join("z.pdf")),
+            source: "D:/Outra fonte".into(),
+            ..before.files[0].clone()
+        });
+        let after = scan(&options(&notes, known.clone()));
+        assert!(!after.sources[0].exists);
+        assert_eq!(after.sources[0].file_count, 0);
+        let expected: Vec<ScannedFile> = before
+            .files
+            .iter()
+            .map(|f| ScannedFile {
+                available: false,
+                ..f.clone()
+            })
+            .collect();
+        assert_eq!(after.files, expected, "same paths, hashes and copies");
+
+        // The exclude filter still applies.
+        let mut excluding = options(&notes, known);
+        excluding.exclude = vec!["CÓPIA".into()];
+        let after = scan(&excluding);
+        assert_eq!(after.files.len(), 2);
+        assert_eq!(after.excluded, vec![before.files[2].path.clone()]);
+    }
+
+    #[test]
+    fn a_reachable_copy_is_the_original_of_an_unreachable_one() {
+        let root = tempfile::tempdir().unwrap();
+        // "a-antiga" sorts before "b-nova": the unreachable copy comes first in scan order.
+        let old = root.path().join("a-antiga");
+        let new = root.path().join("b-nova");
+        fs::create_dir(&old).unwrap();
+        fs::write(old.join("nota.pdf"), b"%PDF nota").unwrap();
+        let before = scan_dir(&old);
+        fs::rename(&old, &new).unwrap();
+
+        let mut both = options(&old, before.files);
+        both.sources.push(Source {
+            path: new.to_string_lossy().into_owned(),
+            recursive: false,
+        });
+        let after = scan(&both);
+        assert_eq!(after.files.len(), 2);
+        let (moved, here) = (&after.files[0], &after.files[1]);
+        assert!(!moved.available && here.available);
+        assert_eq!(moved.duplicate_of.as_deref(), Some(here.path.as_str()));
+        assert_eq!(here.duplicate_of, None);
+        assert_eq!(here.source, new.to_string_lossy());
+    }
+
+    #[test]
+    fn a_file_that_cannot_be_read_keeps_its_known_hash() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("nota.pdf");
+        fs::write(&path, b"%PDF bloqueado").unwrap();
+        let size = fs::metadata(&path).unwrap().len();
+        let lock = lock(&path);
+        if cfg!(windows) {
+            assert!(lock.is_some(), "Windows can always lock the file");
+        }
+        let Some(_lock) = lock else {
+            return;
+        };
+        let listed = path_to_string(&display_path(dir.path()).join("nota.pdf"));
+        let known = |size| ScannedFile {
+            path: listed.clone(),
+            name: "nota.pdf".into(),
+            dir: String::new(),
+            size,
+            hash: "abc".into(),
+            duplicate_of: None,
+            source: String::new(),
+            available: true,
+        };
+
+        let same = scan(&options(dir.path(), vec![known(size)]));
+        assert_eq!(same.files[0].hash, "abc");
+        assert!(!same.files[0].available);
+
+        // Another size is another content: its values are not known.
+        let changed = scan(&options(dir.path(), vec![known(size + 1)]));
+        assert_eq!(changed.files[0].hash, "");
+        assert!(!changed.files[0].available);
     }
 
     #[test]

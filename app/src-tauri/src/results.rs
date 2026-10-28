@@ -2,7 +2,8 @@
 //! live in `<data folder>/cache/results.json` (compact JSON), keyed by the UI's cache key of each
 //! file (its SHA-256 plus its normalized name, since profiles may match by name), and are valid
 //! only for one key: the engine's `EXTRACTION_VERSION`, this build and the profiles fingerprint.
-//! Any change of key starts an empty cache.
+//! Any change of key starts an empty cache; the results of the old key are kept apart, only for
+//! files that cannot be read again (their source cannot be reached), until they are read again.
 
 use crate::files;
 use nfsetable_core::{profiles_fingerprint, DocResult, Profile, Status, EXTRACTION_VERSION};
@@ -47,6 +48,10 @@ fn build_id() -> &'static str {
 struct CacheFile {
     key: String,
     results: HashMap<String, DocResult>,
+    /// Results read under an older key and not read again since: for a file that cannot be read
+    /// now, an older reading is better than no value.
+    #[serde(default)]
+    stale: HashMap<String, DocResult>,
 }
 
 pub struct ResultCache {
@@ -73,23 +78,34 @@ impl ResultCache {
         }
     }
 
-    /// Drops every result when `key` differs from the one they were read with.
+    /// Makes every result stale when `key` differs from the one they were read with.
     fn align(&mut self, key: &str) {
         if self.file.key != key {
-            self.file = CacheFile {
-                key: key.to_string(),
-                results: HashMap::new(),
-            };
+            let older = std::mem::take(&mut self.file.results);
+            self.file.stale.extend(older);
+            self.file.key = key.to_string();
             self.dirty = true;
         }
     }
 
-    /// The known results among the cache keys `ids` (their `path` is empty).
-    pub fn get(&mut self, key: &str, ids: &[String]) -> HashMap<String, DocResult> {
+    /// The known results among the cache keys `ids` (their `path` is empty), and among
+    /// `unavailable` (files that cannot be read now) also the ones read under an older key.
+    pub fn get(
+        &mut self,
+        key: &str,
+        ids: &[String],
+        unavailable: &[String],
+    ) -> HashMap<String, DocResult> {
         self.align(key);
-        ids.iter()
-            .filter_map(|id| self.file.results.get(id).map(|r| (id.clone(), r.clone())))
-            .collect()
+        let file = &self.file;
+        let current = ids
+            .iter()
+            .filter_map(|id| Some((id.clone(), file.results.get(id)?.clone())));
+        let older = unavailable.iter().filter_map(|id| {
+            let result = file.results.get(id).or_else(|| file.stale.get(id))?;
+            Some((id.clone(), result.clone()))
+        });
+        current.chain(older).collect()
     }
 
     /// Keeps `result` under the cache key `id`. Errors are not kept (a locked or missing file may
@@ -103,6 +119,7 @@ impl ResultCache {
             path: String::new(),
             ..result.clone()
         };
+        self.file.stale.remove(id);
         self.file.results.insert(id.to_string(), kept);
         self.dirty = true;
     }
@@ -129,7 +146,8 @@ impl ResultCache {
     }
 }
 
-/// Writes a `pending_save` result.
+/// Writes a file of the cache folder (a `pending_save` result, or a `ScanCache::update` one),
+/// creating the folder first.
 pub fn write(path: &Path, json: &str) -> std::io::Result<()> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
@@ -170,7 +188,7 @@ mod tests {
         assert!(cache.pending_save().is_none(), "nothing new to write");
 
         let mut again = ResultCache::load(dir.path());
-        let found = again.get(&key, &ids(&["aaa:a.pdf", "bbb:b.pdf"]));
+        let found = again.get(&key, &ids(&["aaa:a.pdf", "bbb:b.pdf"]), &[]);
         assert_eq!(found.len(), 1);
         assert_eq!(found["aaa:a.pdf"].path, "", "the path comes from the scan");
         assert_eq!(found["aaa:a.pdf"].doc_type, "NFS-e");
@@ -182,11 +200,37 @@ mod tests {
         let mut cache = ResultCache::load(dir.path());
         let builtin = key(&builtin_profiles());
         cache.insert(&builtin, "aaa:a.pdf", &doc("a.pdf", Status::Ok));
-        assert!(cache.get(&key(&[]), &ids(&["aaa:a.pdf"])).is_empty());
+        assert!(cache.get(&key(&[]), &ids(&["aaa:a.pdf"]), &[]).is_empty());
         assert!(
-            cache.get(&builtin, &ids(&["aaa:a.pdf"])).is_empty(),
-            "dropped for good"
+            cache.get(&builtin, &ids(&["aaa:a.pdf"]), &[]).is_empty(),
+            "not valid again"
         );
+    }
+
+    #[test]
+    fn unreachable_files_keep_results_read_under_another_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let (builtin, other) = (key(&builtin_profiles()), key(&[]));
+        let mut cache = ResultCache::load(dir.path());
+        cache.insert(&builtin, "aaa:a.pdf", &doc("a.pdf", Status::Ok));
+        let id = ids(&["aaa:a.pdf"]);
+
+        // Other profiles (or another build): not valid, but better than nothing for a file that
+        // cannot be read now, also after a restart.
+        assert!(cache.get(&other, &id, &[]).is_empty());
+        let (path, json) = cache.pending_save().unwrap();
+        write(&path, &json).unwrap();
+        let mut again = ResultCache::load(dir.path());
+        assert!(again.get(&other, &id, &[]).is_empty());
+        assert_eq!(again.get(&other, &[], &id)["aaa:a.pdf"].status, Status::Ok);
+
+        // Read again under the new key: the older reading is gone.
+        again.insert(&other, "aaa:a.pdf", &doc("a.pdf", Status::NotFound));
+        assert_eq!(
+            again.get(&other, &id, &id)["aaa:a.pdf"].status,
+            Status::NotFound
+        );
+        assert!(again.file.stale.is_empty());
     }
 
     #[test]
@@ -197,7 +241,7 @@ mod tests {
         cache.insert(&key, "aaa:a.pdf", &doc("a.pdf", Status::Error));
         cache.insert(&key, "", &doc("b.pdf", Status::Ok));
         cache.insert(&key, "ccc:c.pdf", &doc("c.pdf", Status::NoText));
-        let found = cache.get(&key, &ids(&["aaa:a.pdf", "", "ccc:c.pdf"]));
+        let found = cache.get(&key, &ids(&["aaa:a.pdf", "", "ccc:c.pdf"]), &[]);
         assert_eq!(found.keys().collect::<Vec<_>>(), vec!["ccc:c.pdf"]);
     }
 
@@ -222,7 +266,7 @@ mod tests {
         fs::write(dir.path().join("cache").join("results.json"), "{ quebrado").unwrap();
         let mut cache = ResultCache::load(dir.path());
         assert!(cache
-            .get(&key(&builtin_profiles()), &ids(&["aaa:a.pdf"]))
+            .get(&key(&builtin_profiles()), &ids(&["aaa:a.pdf"]), &[])
             .is_empty());
     }
 }

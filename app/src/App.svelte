@@ -46,6 +46,9 @@
     }
     document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('pagehide', flushAll)
+    // Back to the window (e.g. after plugging a drive back in): what was out of reach is looked for.
+    const onFocus = () => store.recheckUnavailable()
+    window.addEventListener('focus', onFocus)
     // Closing the window waits for the pending saves (the delayed ones would be lost otherwise),
     // never more than a few seconds.
     const saveBeforeClose = () =>
@@ -62,6 +65,7 @@
     return () => {
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('pagehide', flushAll)
+      window.removeEventListener('focus', onFocus)
       void closing.then((unlisten) => unlisten())
     }
   })

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { formatBRL, formatMonth } from '../lib/format'
-  import { originLabel } from '../lib/labels'
+  import { originLabel, unavailableHint } from '../lib/labels'
   import { KIND_LABEL, store, type Row } from '../lib/store.svelte'
   import type { Rect, RenderedPage } from '../lib/types'
   import Icon from './Icon.svelte'
@@ -24,12 +24,13 @@
   let pageCount = $state(Math.max(1, row.pageCount))
   let drawMode = $state(false)
 
-  const canMark = $derived(row.extractionStatus !== 'error' && row.extractionStatus !== 'noText')
+  const canMark = $derived(row.available && row.extractionStatus !== 'error' && row.extractionStatus !== 'noText')
   const region = $derived(store.region && store.region.path === row.path ? store.region : null)
   const highlight = $derived(row.highlight && row.highlight.page === page ? row.highlight.bbox : null)
   const drawn = $derived(region && region.page === page ? region.rect : null)
 
   const hint = $derived.by((): { kind: 'warn' | 'info' | 'error'; text: string } | null => {
+    if (!row.available) return { kind: 'warn', text: unavailableHint(row.path, !!row.result) }
     if (row.status === 'duplicate')
       return { kind: 'info', text: `Cópia idêntica de “${row.duplicateName}”. Fica fora dos totais.` }
     if (row.extractionStatus === 'error')
@@ -113,7 +114,7 @@
     </button>
   </div>
 
-  {#if row.status !== 'pending' && row.extractionStatus !== 'error'}
+  {#if row.status !== 'pending' && row.status !== 'unavailable' && row.extractionStatus !== 'error'}
     <p class="facts">
       <span title="Valor bruto da nota, antes das retenções: é o faturamento usado nos impostos">
         <span class="k">Valor do serviço</span>
@@ -191,7 +192,11 @@
       class:btn-primary={drawMode}
       aria-pressed={drawMode}
       disabled={!canMark}
-      title={canMark ? 'Desenhe um retângulo em volta do valor na página' : 'Indisponível: o PDF não tem texto legível'}
+      title={canMark
+        ? 'Desenhe um retângulo em volta do valor na página'
+        : row.available
+          ? 'Indisponível: o PDF não tem texto legível'
+          : 'Indisponível: o arquivo não está acessível agora'}
       onclick={() => (drawMode = !drawMode)}
     >
       <Icon name="marquee" size={15} />

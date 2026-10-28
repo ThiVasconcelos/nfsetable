@@ -139,6 +139,11 @@ export interface Row {
   dir: string
   /** Identity of the file for the user's edits (see fileKey). */
   key: string
+  /**
+   * The file can be read now. When not (its folder moved, its drive disconnected, locked by another
+   * program), its values are those of its last reading, if any, and it is not read again.
+   */
+  available: boolean
   /** Normalized name for search. */
   searchKey: string
   duplicateOf: string | null
@@ -165,7 +170,10 @@ export interface Row {
   kindEdited: boolean
   competenceEdited: boolean
   edited: boolean
-  /** Needs the user: extraction finished without a value (and no manual value). */
+  /**
+   * Needs the user: extraction finished without a value, or the file cannot be read and has no
+   * earlier reading (and no manual value).
+   */
   attention: boolean
   /** Typed as a cancelled note: shown, but never summed. */
   cancelled: boolean
@@ -667,11 +675,14 @@ export class AppStore {
 
   /** Rows a region rule can fix: text found but no value ("Testar nas com erro"). */
   fixableRows = $derived.by(() =>
-    this.rows.filter((r) => r.extractionStatus === 'notFound' && r.cents == null && !r.duplicateOf),
+    this.rows.filter((r) => r.extractionStatus === 'notFound' && r.cents == null && !r.duplicateOf && r.available),
   )
 
-  /** Rows of "Testar em todas": every file once (a duplicate would give the same answer). */
-  testableRows = $derived.by(() => this.rows.filter((r) => !r.duplicateOf))
+  /**
+   * Rows of "Testar em todas": every file once (a duplicate would give the same answer) that can be
+   * read now.
+   */
+  testableRows = $derived.by(() => this.rows.filter((r) => !r.duplicateOf && r.available))
 
   removedCount = $derived.by(
     () =>
@@ -889,6 +900,15 @@ export class AppStore {
   }
 
   /**
+   * Scans again when a source or a file was out of reach (called when the window gets the focus
+   * back): what can be reached again is read, and loses its mark.
+   */
+  recheckUnavailable() {
+    if (this.locked || this.phase !== 'idle' || !this.scan) return
+    if (this.scan.sources.some((s) => !s.exists) || this.scan.files.some((f) => !f.available)) this.refresh()
+  }
+
+  /**
    * Forgets the results kept in memory (e.g. the profiles changed). The backend keeps its own,
    * valid only for the profiles they were read with, so the next scan reads what changed.
    */
@@ -934,11 +954,24 @@ export class AppStore {
     if (this.#dirty || generation !== this.#generation) return
 
     // Results of earlier runs (same profiles) come from the backend instead of being read again.
-    const unknown = [...new Set(scan.files.map(cacheKey).filter((k) => k && !this.#cache.has(k)))]
-    if (unknown.length) {
-      const known = await api.cachedResults(unknown).catch((): Record<string, DocResult> => ({}))
+    // Files that cannot be read now also take older readings (other profiles, another build),
+    // kept apart: once the file is back, it is read again.
+    const unknown = new Set<string>()
+    const unreadable = new Set<string>()
+    for (const f of scan.files) {
+      const key = cacheKey(f)
+      if (key && !this.#cache.has(key)) (f.available ? unknown : unreadable).add(key)
+    }
+    const older = new Map<string, DocResult>()
+    if (unknown.size || unreadable.size) {
+      const known = await api
+        .cachedResults([...unknown], [...unreadable])
+        .catch((): Record<string, DocResult> => ({}))
       if (this.#dirty || generation !== this.#generation) return
-      for (const [hash, result] of Object.entries(known)) this.#cache.set(hash, result)
+      for (const [key, result] of Object.entries(known)) {
+        if (unreadable.has(key)) older.set(key, result)
+        else this.#cache.set(key, result)
+      }
     }
 
     const previousHash = new Map((this.scan?.files ?? []).map((f) => [f.path, f.hash]))
@@ -946,13 +979,15 @@ export class AppStore {
     const todo: string[] = []
     for (const f of scan.files) {
       const key = cacheKey(f)
-      const cached = key ? this.#cache.get(key) : undefined
+      const cached = key ? (this.#cache.get(key) ?? (f.available ? undefined : older.get(key))) : undefined
       if (cached) {
         results[f.path] = cached.path === f.path ? cached : { ...cached, path: f.path }
         continue
       }
-      if (!f.duplicateOf) todo.push(f.path)
-      // Keep showing the previous result while the file is read again (no flicker).
+      // A file that cannot be read now would only fail.
+      if (!f.duplicateOf && f.available) todo.push(f.path)
+      // Keep showing the previous result while the file is read again (no flicker), or while it
+      // cannot be read.
       const old = this.results[f.path]
       if (old && previousHash.get(f.path) === f.hash) results[f.path] = old
     }
@@ -1070,7 +1105,7 @@ export class AppStore {
 
       let status: RowStatus
       if (f.duplicateOf) status = 'duplicate'
-      else if (!result) status = 'pending'
+      else if (!result) status = f.available ? 'pending' : 'unavailable'
       else if (valueEdited) status = 'ok'
       else if (result.status === 'ok' && cents == null) status = 'notFound'
       else status = result.status
@@ -1080,6 +1115,7 @@ export class AppStore {
         name: f.name,
         dir: f.dir,
         key,
+        available: f.available,
         searchKey: nameKey,
         duplicateOf: f.duplicateOf,
         duplicateName: f.duplicateOf ? (nameByPath.get(f.duplicateOf) ?? baseName(f.duplicateOf)) : null,
@@ -1101,7 +1137,7 @@ export class AppStore {
         kindEdited,
         competenceEdited,
         edited: valueEdited || typeEdited || kindEdited || competenceEdited,
-        attention: !f.duplicateOf && !!result && cents == null,
+        attention: !f.duplicateOf && (!!result || !f.available) && cents == null,
         cancelled,
         counted: cents != null && (!f.duplicateOf || this.includeDuplicates) && !cancelled,
         message: result?.message ?? null,

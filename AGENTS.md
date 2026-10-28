@@ -43,6 +43,7 @@ app/src-tauri/src/           nfsetable binary
   data_dir.rs                data folder choice (config.json in the default folder)
   profiles.rs                user profiles in <data folder>/profiles/*.json
   results.rs                 extraction results kept between runs (<data folder>/cache)
+  scans.rs                   files of each source's last scan, for sources out of reach (cache)
 app/src/                     Svelte 5 UI (runes); all text in pt-BR
   lib/api.ts                 typed wrappers of every command (the mock outside Tauri)
   lib/types.ts               TypeScript mirror of model.rs
@@ -59,7 +60,9 @@ scripts/                     fetch-pdfium.sh, fetch-pdfium.ps1
 Persisted data: the data folder holds `profiles/` and `store/` (`companies`, and per company
 `notes-<id>` and `planning-<id>`), plus `cache/results.json`: extraction results by file SHA-256
 and name, valid only for the same `EXTRACTION_VERSION`, build and profiles, so opening the app reads
-only new or changed files.
+only new or changed files (older ones stay apart, only for files that cannot be read now), and
+`cache/scans.json`: the files of each source's last scan, so a source out of reach (drive
+disconnected, folder moved) still lists its files, unavailable, with their earlier values.
 localStorage keeps only UI preferences (theme, sort, startup choice); keys left by the first
 versions are migrated into the store once.
 

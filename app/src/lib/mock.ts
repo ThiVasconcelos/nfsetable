@@ -28,6 +28,7 @@ import type {
   ScanOptions,
   ScanResult,
   ScannedFile,
+  Source,
   SourceInfo,
   TaxCatalog,
   TaxInput,
@@ -606,9 +607,19 @@ function addLazy(dir: string, name: string, build: () => Built, kind: 'found' | 
 
 /** Documents by path, with lazy layouts materialized. */
 function getDoc(path: string): MockDoc | undefined {
+  if (isOffline(path)) return undefined
   const doc = DOCS.get(path)
   doc?.lazy?.()
   return doc
+}
+
+/** Folders (or files) out of reach (see `MockControls.offline`). */
+const offline = new Set<string>()
+
+/** At or below a folder (or file) of `offline`: out of reach, like a disconnected drive. */
+function isOffline(path: string): boolean {
+  for (const o of offline) if (path === o || path.startsWith(`${o}/`)) return true
+  return false
 }
 
 function fnv1a(text: string, seed: number): number {
@@ -1008,10 +1019,11 @@ function saveUserProfiles(list: Profile[]) {
 let userProfiles: Profile[] = []
 
 // Results kept between runs, like the backend's <data folder>/cache/results.json: valid only for
-// the profiles they were read with.
+// the profiles they were read with; the older ones stay apart for files that cannot be read now.
 interface ResultCache {
   key: string
   results: Record<string, DocResult>
+  stale: Record<string, DocResult>
 }
 let resultCache: ResultCache | null = null
 let resultCacheDir = ''
@@ -1031,7 +1043,10 @@ function writeResultCache() {
   }
 }
 
-/** The cache of the data folder in use, emptied when `key` differs from the one it was read with. */
+/**
+ * The cache of the data folder in use, emptied when `key` differs from the one it was read with
+ * (its results become stale).
+ */
 function results(key: string): ResultCache {
   const dir = currentDataDir()
   if (!resultCache || resultCacheDir !== dir) {
@@ -1039,16 +1054,65 @@ function results(key: string): ResultCache {
     resultCacheDir = dir
     try {
       const raw: unknown = JSON.parse(window.localStorage.getItem(resultsKey(dir)) ?? 'null')
-      if (raw && typeof raw === 'object') resultCache = raw as ResultCache
+      if (raw && typeof raw === 'object') {
+        resultCache = raw as ResultCache
+        // Kept by the first versions of the demo without older readings.
+        resultCache.stale ??= {}
+      }
     } catch {
       // A corrupt cache is an empty one.
     }
   }
   if (!resultCache || resultCache.key !== key) {
-    resultCache = { key, results: {} }
+    resultCache = { key, results: {}, stale: { ...resultCache?.stale, ...resultCache?.results } }
     resultCacheDirty = true
   }
   return resultCache
+}
+
+// Files of the last scan of each source, like the backend's <data folder>/cache/scans.json.
+const scansKey = (dir: string) => `${dirPrefix(dir)}mock.scans`
+
+function loadScans(): Record<string, ScannedFile[]> {
+  try {
+    const raw: unknown = JSON.parse(window.localStorage.getItem(scansKey(currentDataDir())) ?? 'null')
+    return raw && typeof raw === 'object' ? (raw as Record<string, ScannedFile[]>) : {}
+  } catch {
+    return {}
+  }
+}
+
+/** The files the last scans of `sources` found. */
+function knownFiles(sources: Source[]): ScannedFile[] {
+  const scans = loadScans()
+  return sources.flatMap((s) => scans[s.path] ?? [])
+}
+
+/** Keeps the files of `result` with a hash, by source. */
+function keepScan(result: ScanResult) {
+  const scans = loadScans()
+  for (const info of result.sources) scans[info.path] = []
+  for (const f of result.files) {
+    if (f.hash) scans[f.source]?.push({ ...f, duplicateOf: null, available: false })
+  }
+  try {
+    window.localStorage.setItem(scansKey(currentDataDir()), JSON.stringify(scans))
+  } catch {
+    // Ignore: an unreachable source just lists nothing next time.
+  }
+}
+
+/** Copies point to the first file with the same hash, among the reachable files first. */
+function markDuplicates(files: ScannedFile[]) {
+  const first = new Map<string, string>()
+  for (const available of [true, false]) {
+    for (const f of files) {
+      if (f.available !== available || !f.hash) continue
+      const original = first.get(f.hash)
+      if (original) f.duplicateOf = original
+      else first.set(f.hash, f.path)
+    }
+  }
 }
 
 /** Deep copy through JSON, like Tauri's IPC does (also works on Svelte state proxies). */
@@ -1252,6 +1316,11 @@ export interface MockControls {
   unreadable: Set<string>
   /** Folders the scan cannot enter (no permission): reported by their source. */
   deniedDirs: Set<string>
+  /**
+   * Folders (or files) out of reach, like a disconnected drive or a moved folder: a source at or
+   * below one of them is not found, and nothing below them can be opened.
+   */
+  offline: Set<string>
 }
 
 const exportLog: ExportRequest[] = []
@@ -1309,6 +1378,7 @@ function installControls() {
     log: callLog,
     unreadable,
     deniedDirs,
+    offline,
   }
   window.__mock = controls
 }
@@ -1367,7 +1437,7 @@ export function createMockBackend(): Backend {
           const keys: string[] = []
           for (let i = 0; i < window.localStorage.length; i++) {
             const key = window.localStorage.key(i)
-            if (key && (key.startsWith(`${from}store.`) || key === `${from}mock.profiles` || key === resultsKey(current))) keys.push(key)
+            if (key && (key.startsWith(`${from}store.`) || key === `${from}mock.profiles` || key === resultsKey(current) || key === scansKey(current))) keys.push(key)
           }
           for (const key of keys) window.localStorage.setItem(to + key.slice(from.length), window.localStorage.getItem(key)!)
           // Profiles never saved in the default folder are still the demo rules: copy them too.
@@ -1390,14 +1460,21 @@ export function createMockBackend(): Backend {
     async scanSources(options: ScanOptions): Promise<ScanResult> {
       callLog.scans++
       await sleep(jitter(180, 120))
+      // Like the backend: the files the last scans of these sources found.
+      const known = knownFiles(options.sources)
       const terms = options.exclude.map(normalizeText).filter(Boolean)
       const excludedName = (name: string) => terms.some((t) => normalizeText(name).includes(t))
       const infos: SourceInfo[] = []
-      const found = new Map<string, MockDoc>()
+      /** By path: the document (or the known file of a source out of reach) and the source listing it. */
+      const found = new Map<string, { doc: MockDoc | null; earlier: ScannedFile | null; source: string }>()
       const excluded = new Set<string>()
+      const unreachable: string[] = []
       for (const source of options.sources) {
         const path = trimTrailingSeparators(source.path)
-        if (FOLDERS.has(path)) {
+        const list = (doc: MockDoc) => {
+          if (!found.has(doc.path)) found.set(doc.path, { doc, earlier: null, source: source.path })
+        }
+        if (FOLDERS.has(path) && !isOffline(path)) {
           let count = 0
           for (const doc of DOCS.values()) {
             const inside = doc.dir === path || (source.recursive && doc.dir.startsWith(`${path}/`))
@@ -1406,42 +1483,60 @@ export function createMockBackend(): Backend {
               excluded.add(doc.path)
               continue
             }
-            found.set(doc.path, doc)
+            list(doc)
             count++
           }
           const denied = [...deniedDirs].filter((d) => d.startsWith(`${path}/`))
           infos.push({ path: source.path, isDir: true, exists: true, fileCount: count, unreadable: denied })
-        } else if (DOCS.has(path)) {
+        } else if (DOCS.has(path) && !isOffline(path)) {
           const doc = DOCS.get(path)!
           const skip = excludedName(doc.name)
           if (skip) excluded.add(doc.path)
-          else found.set(doc.path, doc)
+          else list(doc)
           infos.push({ path: source.path, isDir: false, exists: true, fileCount: skip ? 0 : 1, unreadable: [] })
         } else {
+          unreachable.push(source.path)
           infos.push({ path: source.path, isDir: !isPdfPath(path), exists: false, fileCount: 0, unreadable: [] })
         }
       }
-      const docs = [...found.values()].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
-      const firstByContent = new Map<string, string>()
-      const files: ScannedFile[] = docs.map((doc) => {
-        const first = firstByContent.get(doc.contentId)
-        if (!first && !unreadable.has(doc.path)) firstByContent.set(doc.contentId, doc.path)
-        return {
-          path: doc.path,
-          name: doc.name,
-          dir: doc.dir,
-          size: 38_000 + (fnv1a(doc.contentId, 7) % 90_000),
-          hash: unreadable.has(doc.path) ? '' : fakeHash(doc.contentId),
-          duplicateOf: unreadable.has(doc.path) ? null : (first ?? null),
+      // After every reachable source: a file still reachable from one of them is listed as it is now.
+      for (const source of unreachable) {
+        for (const earlier of known.filter((f) => f.source === source)) {
+          if (excludedName(earlier.name)) excluded.add(earlier.path)
+          else if (!found.has(earlier.path)) found.set(earlier.path, { doc: null, earlier, source })
         }
+      }
+      const knownByPath = new Map(known.filter((f) => f.hash).map((f) => [f.path, f]))
+      const listed = [...found.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      const files: ScannedFile[] = listed.map(([path, { doc, earlier, source }]): ScannedFile => {
+        if (earlier) return { ...earlier, duplicateOf: null, source, available: false }
+        const { name, dir, contentId } = doc!
+        const size = 38_000 + (fnv1a(contentId, 7) % 90_000)
+        if (!unreadable.has(path)) {
+          return { path, name, dir, size, hash: fakeHash(contentId), duplicateOf: null, source, available: true }
+        }
+        // Locked: the hash of the last scan, while the size is the same.
+        const before = knownByPath.get(path)
+        const hash = before && before.size === size ? before.hash : ''
+        return { path, name, dir, size, hash, duplicateOf: null, source, available: false }
       })
-      return { sources: infos, files, excluded: [...excluded].sort() }
+      markDuplicates(files)
+      const result: ScanResult = { sources: infos, files, excluded: [...excluded].sort() }
+      keepScan(result)
+      return result
     },
 
-    async cachedResults(keys: string[]): Promise<Record<string, DocResult>> {
+    async cachedResults(keys: string[], unavailable: string[]): Promise<Record<string, DocResult>> {
       await sleep(jitter(15, 10))
       const cache = results(resultCacheKey(userProfiles))
-      return ipcClone(Object.fromEntries(keys.filter((k) => cache.results[k]).map((k) => [k, cache.results[k]])))
+      const found: Record<string, DocResult> = {}
+      for (const k of keys) if (cache.results[k]) found[k] = cache.results[k]
+      // Files that cannot be read now: an older reading is better than none.
+      for (const k of unavailable) {
+        const older = cache.results[k] ?? cache.stale[k]
+        if (older) found[k] = older
+      }
+      return ipcClone(found)
     },
 
     async extractDocuments(paths: string[], keys: string[]): Promise<DocResult[]> {
@@ -1461,6 +1556,7 @@ export function createMockBackend(): Backend {
       const cache = results(resultCacheKey(profiles))
       out.forEach((doc, i) => {
         if (!keys[i] || doc.status === 'error') return
+        delete cache.stale[keys[i]]
         cache.results[keys[i]] = { ...ipcClone(doc), path: '' }
         resultCacheDirty = true
       })

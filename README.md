@@ -35,7 +35,10 @@ It runs on Windows, Linux and macOS and is built with Tauri 2, Rust, PDFium and 
 
 - Reads whole folders (with or without subfolders) and single files. Remove items one by one or all
   selected at once, and ignore files by name (by default, those containing "cancelada").
-  What was read is kept, so the next time the app opens only new or changed files are read.
+  What was read is kept, so the next time the app opens only new or changed files are read. A
+  folder or file out of reach (a disconnected drive, a moved folder, a file locked by another
+  program) keeps its invoices with the values of their last reading, marked as not accessible
+  until it can be reached again (checked again when you come back to the window).
 - Finds the **net value** (valor líquido), the **service value** (valor do serviço, the gross
   amount) and the **competence month** (competência, the month the service belongs to for tax
   purposes) in:

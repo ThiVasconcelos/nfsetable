@@ -54,7 +54,11 @@ fn main() -> ExitCode {
         .into_iter()
         .map(|path| Source { path, recursive })
         .collect();
-    let found = scan(&ScanOptions { sources, exclude });
+    let found = scan(&ScanOptions {
+        sources,
+        exclude,
+        known: Vec::new(),
+    });
     let profiles = builtin_profiles();
     let fields = builtin_fields();
 

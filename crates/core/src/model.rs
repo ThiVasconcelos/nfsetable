@@ -160,6 +160,12 @@ pub struct ScanOptions {
     pub sources: Vec<Source>,
     /// Case- and accent-insensitive substrings of the FILE NAME; matching files are excluded.
     pub exclude: Vec<String>,
+    /// Files of earlier scans (the desktop app keeps them; the UI sends none). A source that
+    /// cannot be reached now (drive disconnected, folder moved) lists its known files again, and a
+    /// file that cannot be read now takes the hash it had while its size is the same, so earlier
+    /// readings still apply to them.
+    #[serde(default)]
+    pub known: Vec<ScannedFile>,
 }
 
 /// What was found for one [`Source`].
@@ -169,7 +175,8 @@ pub struct SourceInfo {
     pub path: String,
     pub is_dir: bool,
     pub exists: bool,
-    /// Number of PDF files found under this source (after exclusion).
+    /// Number of PDF files found under this source (after exclusion; files of an earlier scan
+    /// listed for a source that cannot be reached are not counted).
     pub file_count: u32,
     /// Folders (or files) below this source that could not be read, e.g. without permission
     /// (at most a few; their PDFs are missing from the scan).
@@ -189,11 +196,21 @@ pub struct ScannedFile {
     pub dir: String,
     /// Size in bytes.
     pub size: u64,
-    /// SHA-256 of the content, lowercase hex; empty when the file could not be read (locked by
-    /// another program, no permission).
+    /// SHA-256 of the content, lowercase hex. For a file the scan could not read (see
+    /// `available`), the hash an earlier scan gave it, or empty when there is none.
     pub hash: String,
-    /// Path of the first file (in scan order) with the same hash, if this one is a duplicate.
+    /// Path of the first file (in scan order, reachable files first) with the same hash, if this
+    /// one is a duplicate.
     pub duplicate_of: Option<String>,
+    /// Path of the source that listed the file, as given in [`ScanOptions`] (the first one when
+    /// several do).
+    #[serde(default)]
+    pub source: String,
+    /// The scan could read the file. False when it comes from [`ScanOptions::known`] (its source
+    /// cannot be reached) or could not be read (locked by another program, no permission): its
+    /// values can only come from earlier readings.
+    #[serde(default)]
+    pub available: bool,
 }
 
 /// Output of [`crate::scan`].

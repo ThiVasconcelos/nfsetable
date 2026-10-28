@@ -6,6 +6,7 @@ mod data_dir;
 mod files;
 mod profiles;
 mod results;
+mod scans;
 mod store;
 
 use commands::AppState;

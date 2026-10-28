@@ -4,8 +4,11 @@
 import { collapseSpaces } from './format'
 import type { ExportFormat, MeiStatus, Origin, Rule, SimplesActivity, Status, TaxRegime } from './types'
 
-/** Status shown in the table: the extraction status plus UI-only states. */
-export type RowStatus = Status | 'duplicate' | 'pending'
+/**
+ * Status shown in the table: the extraction status plus UI-only states (`unavailable`: the file
+ * cannot be read now and was never read before).
+ */
+export type RowStatus = Status | 'duplicate' | 'pending' | 'unavailable'
 
 export const STATUS_LABEL: Record<RowStatus, string> = {
   ok: 'OK',
@@ -14,6 +17,7 @@ export const STATUS_LABEL: Record<RowStatus, string> = {
   error: 'Erro',
   duplicate: 'Duplicada',
   pending: 'Lendo…',
+  unavailable: 'Inacessível',
 }
 
 /** Shorter labels for narrow tables (the full label stays in the tooltip and for screen readers). */
@@ -24,6 +28,7 @@ export const STATUS_SHORT: Record<RowStatus, string> = {
   error: 'Erro',
   duplicate: 'Duplicada',
   pending: 'Lendo…',
+  unavailable: 'Inacessível',
 }
 
 export const STATUS_HINT: Record<RowStatus, string> = {
@@ -33,6 +38,16 @@ export const STATUS_HINT: Record<RowStatus, string> = {
   error: 'Não foi possível abrir o arquivo.',
   duplicate: 'Cópia idêntica de outro arquivo; fica fora dos totais.',
   pending: 'Lendo o arquivo…',
+  unavailable: 'O arquivo não está acessível agora e ainda não foi lido. Reconecte a pasta ou digite o valor.',
+}
+
+/**
+ * Tooltip of a file that cannot be read now (folder moved, drive disconnected, locked by another
+ * program), with or without the values of an earlier reading.
+ */
+export function unavailableHint(path: string, read: boolean): string {
+  const values = read ? 'Os valores são da última leitura.' : 'Ainda não foi lido: reconecte a pasta ou digite o valor.'
+  return `Arquivo não acessível agora: ${path}. ${values}`
 }
 
 export function originLabel(origin: Origin | null | undefined): string {

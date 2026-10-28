@@ -2,7 +2,7 @@
 
 use nfsetable_core::{
     builtin_profiles, export_csv, scan, CsvRow, DocKind, DocResult, FieldValue, Origin, Rect,
-    RegionAnchor, Rule, ScanOptions, Source, Status,
+    RegionAnchor, Rule, ScanOptions, ScannedFile, Source, Status,
 };
 use serde_json::json;
 use std::collections::BTreeMap;
@@ -32,6 +32,7 @@ fn scan_filters_sorts_and_finds_duplicates() {
             recursive: false,
         }],
         exclude: vec!["CANCELADA".into()],
+        known: vec![],
     });
     let files = names(result.files.iter().map(|f| f.path.clone()));
     assert_eq!(
@@ -99,6 +100,7 @@ fn scan_recurses_accepts_files_and_reports_missing_sources() {
         ],
         // Accent- and case-insensitive.
         exclude: vec!["CANCELÁDA".into()],
+        known: vec![],
     });
     assert_eq!(result.files.len(), 11);
     assert!(result.files.iter().any(|f| f.name == "danfse-v2-sub.pdf"));
@@ -111,6 +113,16 @@ fn scan_recurses_accepts_files_and_reports_missing_sources() {
         1
     );
     assert_eq!(result.sources[1].file_count, 1);
+    let v2 = result
+        .files
+        .iter()
+        .find(|f| f.name == "danfse-v2.pdf")
+        .unwrap();
+    assert_eq!(
+        v2.source, result.sources[0].path,
+        "the first source that lists it"
+    );
+    assert!(result.files.iter().all(|f| f.available));
     assert!(!result.sources[1].is_dir);
     assert!(!result.sources[2].exists);
     assert_eq!(result.sources[2].file_count, 0);
@@ -240,7 +252,29 @@ fn json_shape_matches_the_frontend_types() {
         json!({ "type": "auto" })
     );
 
+    // A scanned file goes to the frontend and comes back in `known`.
+    let file = ScannedFile {
+        path: "C:/Notas/a.pdf".into(),
+        name: "a.pdf".into(),
+        dir: "C:/Notas".into(),
+        size: 10,
+        hash: "abc".into(),
+        duplicate_of: None,
+        source: "C:/Notas".into(),
+        available: false,
+    };
+    let value = serde_json::to_value(&file).unwrap();
+    assert_eq!(value["duplicateOf"], serde_json::Value::Null);
+    assert_eq!(value["source"], "C:/Notas");
+    assert_eq!(value["available"], false);
+    let options: ScanOptions =
+        serde_json::from_value(json!({ "sources": [], "exclude": [], "known": [value] })).unwrap();
+    assert_eq!(options.known, vec![file]);
+
     // Optional keys may be omitted by the frontend.
+    let options: ScanOptions =
+        serde_json::from_value(json!({ "sources": [], "exclude": [] })).unwrap();
+    assert!(options.known.is_empty());
     let parsed: Rule = serde_json::from_value(json!({
         "type": "region", "rect": { "x": 0.1, "y": 0.1, "w": 0.1, "h": 0.1 }, "page": 0
     }))

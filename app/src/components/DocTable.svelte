@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte'
   import { formatBRL, formatInt, plural, shortenPath } from '../lib/format'
-  import { STATUS_HINT, originLabel } from '../lib/labels'
+  import { STATUS_HINT, originLabel, unavailableHint } from '../lib/labels'
   import { KIND_LABEL, store, type Row, type SortKey } from '../lib/store.svelte'
   import BulkTypeMenu from './BulkTypeMenu.svelte'
   import CompetenceCell from './CompetenceCell.svelte'
@@ -125,7 +125,8 @@
           ? STATUS_HINT.ok
           : (row.message ?? STATUS_HINT[row.status])
     const origin = originLabel(row.origin)
-    return origin ? `${text} Origem: ${origin}.` : text
+    const earlier = !row.available && row.status !== 'unavailable' ? 'Valores da última leitura: o arquivo não está acessível agora.' : ''
+    return [text, origin ? `Origem: ${origin}.` : '', earlier].filter(Boolean).join(' ')
   }
 
   let previewTimer: ReturnType<typeof setTimeout> | undefined
@@ -369,7 +370,9 @@
               />
             </td>
             <td class="c-file">
-              <div class="name" title={row.path}>{row.name}</div>
+              <div class="name" title={row.available ? row.path : unavailableHint(row.path, !!row.result)}>
+                {#if !row.available}<span class="offline"><Icon name="alert" size={12} /><span class="sr-only">Arquivo não acessível:</span></span>{/if}{row.name}
+              </div>
               <div class="dir" title={row.dir}>{shortenPath(row.dir, 3)}</div>
             </td>
             <td class="c-type"><TypeCell {row} {tabbable} /></td>
@@ -762,6 +765,13 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .offline {
+    display: inline-flex;
+    margin-right: 4px;
+    vertical-align: -1px;
+    color: var(--warn);
   }
 
   .dir {

@@ -17,9 +17,14 @@
   const uid = $props.id()
   const switchId = `sub-${uid}`
 
+  /** Notes listed from the last scan while the source cannot be reached. */
+  const kept = $derived(missing ? (store.scan?.files.filter((f) => f.source === source.path).length ?? 0) : 0)
   const meta = $derived.by(() => {
     if (!info) return store.phase === 'idle' ? '' : 'Procurando…'
-    if (!info.exists) return isDir ? 'Pasta não encontrada' : 'Arquivo não encontrado'
+    if (!info.exists) {
+      const what = isDir ? 'Pasta não encontrada' : 'Arquivo não encontrado'
+      return kept ? `${what} · ${plural(kept, 'nota da última leitura', 'notas da última leitura')}` : what
+    }
     return plural(info.fileCount, 'PDF', 'PDFs')
   })
   const unreadable = $derived(info?.unreadable ?? [])

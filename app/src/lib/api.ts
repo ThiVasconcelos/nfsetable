@@ -43,7 +43,7 @@ export interface Backend {
   appInfo(): Promise<AppInfo>
   setDataDir(path: string | null, copy: boolean): Promise<AppInfo>
   scanSources(options: ScanOptions): Promise<ScanResult>
-  cachedResults(keys: string[]): Promise<Record<string, DocResult>>
+  cachedResults(keys: string[], unavailable: string[]): Promise<Record<string, DocResult>>
   extractDocuments(paths: string[], keys: string[]): Promise<DocResult[]>
   saveCachedResults(): Promise<void>
   renderPage(path: string, page: number, width: number): Promise<RenderedPage>
@@ -86,7 +86,7 @@ const tauriBackend: Backend = {
   appInfo: () => invoke<AppInfo>('app_info'),
   setDataDir: (path, copy) => invoke<AppInfo>('set_data_dir', { path, copy }),
   scanSources: (options) => invoke<ScanResult>('scan_sources', { options }),
-  cachedResults: (keys) => invoke<Record<string, DocResult>>('cached_results', { keys }),
+  cachedResults: (keys, unavailable) => invoke<Record<string, DocResult>>('cached_results', { keys, unavailable }),
   extractDocuments: (paths, keys) => invoke<DocResult[]>('extract_documents', { paths, keys }),
   saveCachedResults: () => invoke<void>('save_cached_results'),
   renderPage: (path, page, width) => invoke<RenderedPage>('render_page', { path, page, width }),
@@ -184,9 +184,12 @@ export const setDataDir = async (path: string | null, copy: boolean): Promise<Ap
 export const scanSources = async (options: ScanOptions): Promise<ScanResult> =>
   (await backend()).scanSources(options)
 
-/** `cached_results(keys)`: results of earlier runs by cache key, valid for the current profiles. */
-export const cachedResults = async (keys: string[]): Promise<Record<string, DocResult>> =>
-  (await backend()).cachedResults(keys)
+/**
+ * `cached_results(keys, unavailable)`: results of earlier runs by cache key, valid for the current
+ * profiles; for the keys in `unavailable` (files that cannot be read now), also older readings.
+ */
+export const cachedResults = async (keys: string[], unavailable: string[]): Promise<Record<string, DocResult>> =>
+  (await backend()).cachedResults(keys, unavailable)
 
 /**
  * `extract_documents(paths, keys)`: `keys[i]` is the cache key of `paths[i]` (kept for the next

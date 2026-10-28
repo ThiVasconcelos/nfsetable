@@ -70,6 +70,11 @@
     background: var(--danger-soft);
   }
 
+  .unavailable {
+    color: var(--warn);
+    background: var(--warn-soft);
+  }
+
   .duplicate {
     color: var(--muted-badge);
     background: var(--muted-soft);

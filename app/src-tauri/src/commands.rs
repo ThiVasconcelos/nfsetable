@@ -3,6 +3,7 @@
 //! every IPC call) never waits for it; long batches report progress through events.
 
 use crate::results::{self, ResultCache};
+use crate::scans::ScanCache;
 use crate::{data_dir, profiles, store};
 use nfsetable_core::{
     builtin_fields, builtin_profiles, AppInfo, DocResult, Engine, ExportRequest, FieldDef, Profile,
@@ -32,6 +33,8 @@ pub struct AppState {
     results: Arc<Mutex<ResultCache>>,
     /// Held while the results are written, so writes land one at a time and in order.
     results_writer: Arc<Mutex<()>>,
+    /// Files of the last scan of each source, in the data folder in use.
+    scans: Arc<Mutex<ScanCache>>,
     /// The rule test allowed to go on (0: none); a newer test or `cancel_test` stops the others.
     test_run: Arc<AtomicU32>,
 }
@@ -43,6 +46,7 @@ impl AppState {
             engine: engine.map(Arc::new),
             results: Arc::new(Mutex::new(ResultCache::load(&data_dir))),
             results_writer: Arc::new(Mutex::new(())),
+            scans: Arc::new(Mutex::new(ScanCache::load(&data_dir))),
             test_run: Arc::new(AtomicU32::new(0)),
             default_dir,
             data_dir: RwLock::new(data_dir),
@@ -191,27 +195,46 @@ pub async fn set_data_dir(
         blocking(move || data_dir::switch(&default_dir, &current, target.as_deref(), copy))
             .await??;
     let dir = new_dir.clone();
-    let cache = blocking(move || ResultCache::load(&dir)).await?;
+    let (cache, scans) = blocking(move || (ResultCache::load(&dir), ScanCache::load(&dir))).await?;
     *state.results() = cache;
+    *lock(&state.scans) = scans;
     set_lock(&state.data_dir, new_dir);
     set_lock(&state.data_dir_error, None);
     Ok(state.info(&app))
 }
 
+/// Scans the sources with the files their last scans found (see `scans`), and keeps this one's.
 #[tauri::command]
-pub async fn scan_sources(options: ScanOptions) -> Result<ScanResult, String> {
-    blocking(move || nfsetable_core::scan(&options)).await
+pub async fn scan_sources(
+    state: State<'_, AppState>,
+    mut options: ScanOptions,
+) -> Result<ScanResult, String> {
+    let scans = state.scans.clone();
+    blocking(move || {
+        options.known = lock(&scans).known(&options.sources);
+        let result = nfsetable_core::scan(&options);
+        // Under the lock: writes land one at a time, in the order of the cache.
+        let mut cache = lock(&scans);
+        if let Some((path, json)) = cache.update(&result) {
+            // Losing it only costs the files of an unreachable source on the next start.
+            let _ = results::write(&path, &json);
+        }
+        result
+    })
+    .await
 }
 
 /// Results read in earlier runs for these cache keys (see `extract_documents`), valid for the
-/// current profiles.
+/// current profiles; for the keys in `unavailable` (files that cannot be read now), also the ones
+/// read with other profiles or by another build.
 #[tauri::command]
 pub async fn cached_results(
     state: State<'_, AppState>,
     keys: Vec<String>,
+    unavailable: Vec<String>,
 ) -> Result<HashMap<String, DocResult>, String> {
     let key = results::key(&state.all_profiles());
-    Ok(state.results().get(&key, &keys))
+    Ok(state.results().get(&key, &keys, &unavailable))
 }
 
 /// Extracts `paths` and keeps the results for the next runs under `keys` (same order: the UI's
