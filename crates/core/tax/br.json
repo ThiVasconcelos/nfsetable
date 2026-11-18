@@ -150,7 +150,7 @@
       "iss": 5.00
     },
     {
-      "source": "LC 123/2006, art. 18-A, § 3º, V, e Anexo VII (redação da LC 214/2025, Anexo XXIII); Res. CGSN 140/2018, art. 101, IV, e Anexo XIII (redação da Res. CGSN 190/2026); Lei 8.212/1991, art. 21, § 2º, II, a",
+      "source": "LC 123/2006, art. 18-A, § 3º, V (redação da LC 214/2025), e Anexo VII (incluído pela LC 214/2025, art. 520 e Anexo XXIII); Res. CGSN 140/2018, art. 101, I, IV e V, e Anexo XIII (incluído pela Res. CGSN 190/2026); Lei 8.212/1991, art. 21, § 2º, II, a",
       "valid_from": "2027-01-01",
       "valid_to": "2028-12-31",
       "inss_rate_on_minimum_wage": 0.05,
@@ -159,7 +159,7 @@
       "ibs": 0.006
     },
     {
-      "source": "LC 123/2006, art. 18-A, § 3º, V, e Anexo VII (redação da LC 214/2025, Anexo XXIII); Res. CGSN 140/2018, art. 101, IV, e Anexo XIII (redação da Res. CGSN 190/2026); Lei 8.212/1991, art. 21, § 2º, II, a",
+      "source": "LC 123/2006, art. 18-A, § 3º, V (redação da LC 214/2025), e Anexo VII (incluído pela LC 214/2025, art. 520 e Anexo XXIII); Res. CGSN 140/2018, art. 101, I, IV e V, e Anexo XIII (incluído pela Res. CGSN 190/2026); Lei 8.212/1991, art. 21, § 2º, II, a",
       "valid_from": "2029-01-01",
       "valid_to": "2029-12-31",
       "inss_rate_on_minimum_wage": 0.05,
@@ -168,7 +168,7 @@
       "ibs": 0.20
     },
     {
-      "source": "LC 123/2006, art. 18-A, § 3º, V, e Anexo VII (redação da LC 214/2025, Anexo XXIII); Res. CGSN 140/2018, art. 101, IV, e Anexo XIII (redação da Res. CGSN 190/2026); Lei 8.212/1991, art. 21, § 2º, II, a",
+      "source": "LC 123/2006, art. 18-A, § 3º, V (redação da LC 214/2025), e Anexo VII (incluído pela LC 214/2025, art. 520 e Anexo XXIII); Res. CGSN 140/2018, art. 101, I, IV e V, e Anexo XIII (incluído pela Res. CGSN 190/2026); Lei 8.212/1991, art. 21, § 2º, II, a",
       "valid_from": "2030-01-01",
       "valid_to": "2030-12-31",
       "inss_rate_on_minimum_wage": 0.05,
@@ -177,7 +177,7 @@
       "ibs": 0.40
     },
     {
-      "source": "LC 123/2006, art. 18-A, § 3º, V, e Anexo VII (redação da LC 214/2025, Anexo XXIII); Res. CGSN 140/2018, art. 101, IV, e Anexo XIII (redação da Res. CGSN 190/2026); Lei 8.212/1991, art. 21, § 2º, II, a",
+      "source": "LC 123/2006, art. 18-A, § 3º, V (redação da LC 214/2025), e Anexo VII (incluído pela LC 214/2025, art. 520 e Anexo XXIII); Res. CGSN 140/2018, art. 101, I, IV e V, e Anexo XIII (incluído pela Res. CGSN 190/2026); Lei 8.212/1991, art. 21, § 2º, II, a",
       "valid_from": "2031-01-01",
       "valid_to": "2031-12-31",
       "inss_rate_on_minimum_wage": 0.05,
@@ -186,7 +186,7 @@
       "ibs": 0.60
     },
     {
-      "source": "LC 123/2006, art. 18-A, § 3º, V, e Anexo VII (redação da LC 214/2025, Anexo XXIII); Res. CGSN 140/2018, art. 101, IV, e Anexo XIII (redação da Res. CGSN 190/2026); Lei 8.212/1991, art. 21, § 2º, II, a",
+      "source": "LC 123/2006, art. 18-A, § 3º, V (redação da LC 214/2025), e Anexo VII (incluído pela LC 214/2025, art. 520 e Anexo XXIII); Res. CGSN 140/2018, art. 101, I, IV e V, e Anexo XIII (incluído pela Res. CGSN 190/2026); Lei 8.212/1991, art. 21, § 2º, II, a",
       "valid_from": "2032-01-01",
       "valid_to": "2032-12-31",
       "inss_rate_on_minimum_wage": 0.05,
@@ -195,7 +195,7 @@
       "ibs": 0.80
     },
     {
-      "source": "LC 123/2006, art. 18-A, § 3º, V, e Anexo VII (redação da LC 214/2025, Anexo XXIII); Res. CGSN 140/2018, art. 101, IV, e Anexo XIII (redação da Res. CGSN 190/2026); Lei 8.212/1991, art. 21, § 2º, II, a",
+      "source": "LC 123/2006, art. 18-A, § 3º, V (redação da LC 214/2025), e Anexo VII (incluído pela LC 214/2025, art. 520 e Anexo XXIII); Res. CGSN 140/2018, art. 101, I, IV e V, e Anexo XIII (incluído pela Res. CGSN 190/2026); Lei 8.212/1991, art. 21, § 2º, II, a",
       "valid_from": "2033-01-01",
       "valid_to": null,
       "inss_rate_on_minimum_wage": 0.05,
@@ -317,7 +317,7 @@
       }
     },
     {
-      "source": "LC 123/2006, art. 3º, I e II, art. 18, §§ 1º (RBT12 dos 12 meses anteriores ao mês anterior, redação da LC 214/2025, art. 517), 1º-A, 1º-B, 5º-J, 5º-M e 24, e Anexos III e V (redação da LC 214/2025, art. 519 e Anexos XX e XXII; Anexo XX com redação da LC 227/2026); Res. CGSN 140/2018, arts. 21, 22 (1ª faixa nos 2 primeiros meses de atividade, § 2º) e 26 (Fator R de 0,28 nesses meses, § 6º) e Anexos III e V (redação da Res. CGSN 190/2026). CBS e IBS no lugar de Cofins e PIS; no Anexo V a lei não reparte o ISS acima de 5%, que não é atingido",
+      "source": "LC 123/2006, art. 3º, I e II, art. 18, §§ 1º (RBT12 dos 12 meses anteriores ao mês anterior, redação da LC 214/2025, art. 517), 1º-A, 1º-B, 5º-J, 5º-M e 24, e Anexos III e V (redação da LC 214/2025, art. 519 e Anexos XX e XXII; Anexo XX com redação da LC 227/2026); Res. CGSN 140/2018, arts. 21, 22 (1ª faixa nos 2 primeiros meses de atividade, § 2º) e 26 (Fator R de 0,28 nesses meses, § 6º) e Anexos III e V (redação da Res. CGSN 190/2026). CBS e IBS no lugar de Cofins e PIS; no Anexo V não há tabela do excedente do ISS: vale o rateio proporcional do art. 18, § 1º-B, I (incluído pela LC 227/2026), e o teto de 5% não é atingido",
       "valid_from": "2027-01-01",
       "valid_to": "2028-12-31",
       "me_limit": 360000.00,
