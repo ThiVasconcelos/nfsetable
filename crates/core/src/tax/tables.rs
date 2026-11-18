@@ -17,6 +17,18 @@ use std::sync::OnceLock;
 const BR_JSON: &str = include_str!("../../tax/br.json");
 const SCHEMA_VERSION: u32 = 1;
 
+/// The versioned tables of the file, by their JSON key.
+const TABLE_KEYS: [&str; 8] = [
+    "minimum_wage",
+    "inss",
+    "irrf",
+    "irrf_reduction",
+    "mei",
+    "mei_das",
+    "simples",
+    "presumido",
+];
+
 /// Canonical order of the taxes of a split: the columns of the tables of LC 123/2006, IRPJ, CSLL,
 /// Cofins, PIS, CPP and ISS until 2026, and IRPJ, CSLL, CBS, CPP, ISS and IBS from 2027 (LC
 /// 214/2025, Anexos XX and XXII). Unknown taxes go after these, alphabetically.
@@ -91,6 +103,10 @@ struct Coverage {
     before_note: String,
     /// pt-BR: what is missing after `valid_to`.
     after_note: String,
+    /// pt-BR notes on tables still missing inside the covered months, by table key (e.g.
+    /// "presumido"): added to the warning when such a table falls back.
+    #[serde(default)]
+    pending: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -433,12 +449,13 @@ pub(crate) enum CoverageStatus {
     After(Date, &'static str),
 }
 
-/// A table that is not in force in the reference month: its pt-BR name and the start of the
-/// version used instead.
+/// A table that is not in force in the reference month: its pt-BR name, the start of the version
+/// used instead and, when the file has one, a pt-BR note on why it is missing.
 #[derive(Debug, Clone)]
 pub(crate) struct Fallback {
     pub label: &'static str,
     pub used_from: Date,
+    pub note: Option<&'static str>,
 }
 
 /// The tables in force in a reference month.
@@ -461,17 +478,24 @@ pub(crate) struct Tables {
 
 struct Picker {
     date: Date,
+    pending: &'static BTreeMap<String, String>,
     fallbacks: Vec<Fallback>,
     sources: Vec<String>,
 }
 
 impl Picker {
-    fn pick<T: Versioned>(&mut self, label: &'static str, versions: &'static [T]) -> &'static T {
+    /// The version of the table `key` (pt-BR `label`) in force on the date, or the nearest one.
+    fn pick<T: Versioned>(
+        &mut self,
+        (key, label): (&str, &'static str),
+        versions: &'static [T],
+    ) -> &'static T {
         let (table, fallback) = pick(versions, self.date);
         if fallback {
             self.fallbacks.push(Fallback {
                 label,
                 used_from: table.valid_from(),
+                note: self.pending.get(key).map(String::as_str),
             });
         }
         self.sources
@@ -493,19 +517,22 @@ impl TaxData {
         };
         let mut picker = Picker {
             date,
+            pending: &self.coverage.pending,
             fallbacks: Vec::new(),
             sources: Vec::new(),
         };
-        let minimum_wage = picker.pick("Salário mínimo", &self.minimum_wage).monthly;
-        let inss = picker.pick("INSS do pró-labore", &self.inss);
-        let irrf = picker.pick("IRRF do pró-labore", &self.irrf);
+        let minimum_wage = picker
+            .pick(("minimum_wage", "Salário mínimo"), &self.minimum_wage)
+            .monthly;
+        let inss = picker.pick(("inss", "INSS do pró-labore"), &self.inss);
+        let irrf = picker.pick(("irrf", "IRRF do pró-labore"), &self.irrf);
         // The reduction did not exist before its first version: that is not a fallback.
         let irrf_reduction = (date >= self.irrf_reduction[0].valid_from)
-            .then(|| picker.pick("Redução do IRRF", &self.irrf_reduction));
-        let mei = picker.pick("MEI", &self.mei);
-        let mei_das = picker.pick("DAS-MEI", &self.mei_das);
-        let simples = picker.pick("Simples Nacional", &self.simples);
-        let presumido = picker.pick("Lucro Presumido", &self.presumido);
+            .then(|| picker.pick(("irrf_reduction", "Redução do IRRF"), &self.irrf_reduction));
+        let mei = picker.pick(("mei", "MEI"), &self.mei);
+        let mei_das = picker.pick(("mei_das", "DAS-MEI"), &self.mei_das);
+        let simples = picker.pick(("simples", "Simples Nacional"), &self.simples);
+        let presumido = picker.pick(("presumido", "Lucro Presumido"), &self.presumido);
         Tables {
             minimum_wage,
             inss,
@@ -531,6 +558,14 @@ impl TaxData {
         }
         if self.coverage.valid_from > self.coverage.valid_to {
             return Err("coverage: valid_from depois de valid_to".into());
+        }
+        if let Some(key) = self
+            .coverage
+            .pending
+            .keys()
+            .find(|key| !TABLE_KEYS.contains(&key.as_str()))
+        {
+            return Err(format!("coverage.pending: tabela desconhecida {key}"));
         }
         check_versions("minimum_wage", &self.minimum_wage)?;
         check_versions("inss", &self.inss)?;
@@ -818,7 +853,7 @@ mod tests {
     fn falls_back_to_the_nearest_version() {
         let data = data().unwrap();
         let later = data.tables(month("2029-03"));
-        assert!(matches!(later.coverage, CoverageStatus::After(_, note) if note.contains("2027")));
+        assert!(matches!(later.coverage, CoverageStatus::After(_, note) if note.contains("2028")));
         assert_eq!(later.minimum_wage, dec!(1621));
         let labels: Vec<&str> = later.fallbacks.iter().map(|f| f.label).collect();
         assert_eq!(
@@ -828,6 +863,23 @@ mod tests {
                 "INSS do pró-labore",
                 "Simples Nacional",
                 "Lucro Presumido"
+            ]
+        );
+
+        // Inside the covered months, the tables still missing carry the note of the file.
+        let pending = data.tables(month("2027-06"));
+        assert_eq!(pending.coverage, CoverageStatus::Within);
+        let fallbacks: Vec<(&str, bool)> = pending
+            .fallbacks
+            .iter()
+            .map(|f| (f.label, f.note.is_some()))
+            .collect();
+        assert_eq!(
+            fallbacks,
+            [
+                ("Salário mínimo", true),
+                ("INSS do pró-labore", true),
+                ("Lucro Presumido", true)
             ]
         );
 
@@ -892,6 +944,10 @@ mod tests {
             1,
         );
         assert!(parse(&broken).is_err());
+        let broken = BR_JSON.replacen("\"inss\": \"O teto", "\"isss\": \"O teto", 1);
+        assert!(parse(&broken)
+            .unwrap_err()
+            .contains("tabela desconhecida isss"));
         let broken = BR_JSON.replacen(
             "\"valid_to\": \"2025-04-30\"",
             "\"valid_to\": \"2025-05-31\"",

@@ -82,7 +82,8 @@ Aponte a pasta das notas, confira os valores e veja o total da seleção. Tudo r
   (por exemplo, uma pasta sincronizada para ter backup).
 - Seletor de CNAE com a regra de anexo de cada atividade de TI.
 
-As tabelas são de 2025 e 2026 e ficam em [crates/core/tax/br.json](crates/core/tax/br.json), com a
+As tabelas vão de 2025 a 2027 (ainda faltam o salário mínimo, o teto do INSS e o Lucro Presumido
+de 2027, e o app avisa) e ficam em [crates/core/tax/br.json](crates/core/tax/br.json), com a
 base legal de cada bloco (o app mostra as fontes em "Avisos e fontes").
 É estimativa para planejar e **não substitui um contador**.
 

@@ -815,15 +815,30 @@ fn malformed_and_duplicate_months() {
 
 #[test]
 fn reference_month_outside_the_tables() {
+    // 2027 is covered, but its minimum wage, INSS ceiling and Lucro Presumido are not out yet: the
+    // 2026 ones are used, each with a warning that says why.
     let report = tax_report(&input("2027-03", months("2027-01", 3, 500_000))).unwrap();
     // Uses the 2026 minimum wage, 1.621,00: DAS-MEI 81,05 + 5,00 + CBS/IBS 1,00 = 87,05.
     assert_eq!(report.mei.das_cents, 8_705);
     assert_eq!(report.pro_labore.gross_cents, 162_100);
     assert!(has_warning(
         &report,
-        "As regras de 2027 em diante ainda não estão incluídas"
+        "Tabela não incluída para 03/2027: Salário mínimo; foi usada a versão vigente a partir de \
+         01/01/2026. O salário mínimo de 2027 ainda não foi publicado"
     ));
-    assert!(has_warning(&report, "IBS e CBS"));
+    assert!(has_warning(&report, "INSS do pró-labore"));
+    assert!(has_warning(
+        &report,
+        "o Lucro Presumido ainda usa o PIS e a Cofins de 2026"
+    ));
+    assert!(!has_warning(&report, "Simples Nacional;"));
+
+    // From 2028 the rules are incomplete.
+    let report = tax_report(&input("2029-03", months("2029-01", 3, 500_000))).unwrap();
+    assert!(has_warning(
+        &report,
+        "As regras de 2028 em diante estão incompletas"
+    ));
 
     let report = tax_report(&input("2024-06", months("2024-04", 3, 500_000))).unwrap();
     // Uses the nearest (2025) tables: minimum wage 1.518,00.

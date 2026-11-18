@@ -25,8 +25,13 @@ pub(crate) fn coverage_warnings(tables: &Tables, reference: Month, warnings: &mu
     match tables.coverage {
         CoverageStatus::Within => {
             for fallback in &tables.fallbacks {
+                let note = fallback
+                    .note
+                    .map(|note| format!(" {note}"))
+                    .unwrap_or_default();
                 warnings.push(format!(
-                    "Tabela não incluída para {}: {}; foi usada a versão vigente a partir de {}.",
+                    "Tabela não incluída para {}: {}; foi usada a versão vigente a partir de \
+                     {}.{note}",
                     reference.display(),
                     fallback.label,
                     fallback.used_from

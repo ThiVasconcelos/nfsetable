@@ -94,6 +94,8 @@ interface Tables {
   annex: Record<'III' | 'V', Bracket[]>
   /** The RBT12 window ends this many months before the month (2 from 2027 on). */
   windowOffset: number
+  /** pt-BR warnings on what these tables still lack. */
+  pending: string[]
 }
 
 const TABLES_2026: Tables = {
@@ -105,6 +107,7 @@ const TABLES_2026: Tables = {
   meiDasFixed: { iss: 500 },
   annex: ANNEX_2026,
   windowOffset: 1,
+  pending: [],
 }
 /** LC 238/2026: the MEI limit goes to R$ 110 mil in 2027 and R$ 140 mil from 2028 on. */
 const TABLES_2027: Tables = {
@@ -116,8 +119,20 @@ const TABLES_2027: Tables = {
   meiDasFixed: { iss: 500, cbs: 99, ibs: 1 },
   annex: ANNEX_2027,
   windowOffset: 2,
+  pending: [
+    'O salário mínimo e o teto do INSS de 2027 ainda não foram publicados: usados os de 2026.',
+    'Em 2027 o PIS e a Cofins acabam e entram a CBS e o IBS; o Lucro Presumido ainda usa o PIS e a Cofins de 2026.',
+  ],
 }
-const TABLES_2028: Tables = { ...TABLES_2027, from: '2028-01', meiAnnualLimit: 14_000_000, meiOpeningMonthlyLimit: 1_166_667 }
+const TABLES_2028: Tables = {
+  ...TABLES_2027,
+  from: '2028-01',
+  meiAnnualLimit: 14_000_000,
+  meiOpeningMonthlyLimit: 1_166_667,
+  pending: [
+    'As regras de 2028 em diante estão incompletas: faltam salário mínimo, INSS, o Lucro Presumido com CBS e IBS e, a partir de 2029, as tabelas do Simples Nacional da troca do ISS pelo IBS.',
+  ],
+}
 
 /** DAS-MEI from 2029: the ISS falls and the IBS takes its place (no ISS from 2033). */
 const TABLES_2029_ON: Tables[] = [
@@ -575,9 +590,11 @@ export function mockTaxReport(input: TaxInput): TaxReport {
   if (projectedStatus !== 'within')
     warnings.push(`No ritmo atual, o faturamento do ano passa do limite do MEI (${formatBRLPlain(limit)}).`)
   warnings.push('Não considera retenções na fonte (IRRF, CSRF, ISS retido), 13º, férias nem outras receitas.')
-  warnings.push(
-    `Tabelas de ${refTables.from.slice(0, 4)}: salário mínimo de ${formatBRLPlain(refTables.minWage)} e teto do INSS de ${formatBRLPlain(refTables.inssCeiling)}.`,
-  )
+  if (refTables.pending.length) warnings.push(...refTables.pending)
+  else
+    warnings.push(
+      `Tabelas de ${refTables.from.slice(0, 4)}: salário mínimo de ${formatBRLPlain(refTables.minWage)} e teto do INSS de ${formatBRLPlain(refTables.inssCeiling)}.`,
+    )
 
   return {
     referenceMonth: ref,

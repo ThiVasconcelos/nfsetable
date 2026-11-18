@@ -135,7 +135,9 @@ legal basis).
 1. Add a block with the new validity without deleting the old one: the engine picks the block in
    force in the month being computed (the reference month), never by today's date. Blocks must be
    in chronological order without overlaps, so close the previous one with `valid_to`. If the file
-   now covers more months, update `coverage` as well.
+   now covers more months, update `coverage` as well, and give each table of those months that is
+   not out yet (e.g. a minimum wage still unpublished) a pt-BR note under `coverage.pending`, keyed
+   by the table: the app adds it to the warning about that table.
 2. Cite the law or regulation in `source` and, if you could not confirm a number at the primary
    source, mark the block `"unverified": true`.
 3. Add a case to `crates/core/tests/tax.rs` with every expectation computed by hand and the

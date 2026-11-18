@@ -1,13 +1,18 @@
 {
   "schema_version": 1,
   "jurisdiction": "BR",
-  "updated_at": "2026-09-29",
-  "disclaimer": "Tabelas tributárias usadas pelas estimativas do nfsetable (pró-labore, MEI, Simples Nacional e Lucro Presumido). Conferidas na fonte primária em 29/09/2026, exceto os blocos com \"unverified\": true. Não substituem um contador. Valores monetários em reais, taxas em decimal (0.06 = 6%), datas em AAAA-MM-DD. Cada bloco vale de valid_from a valid_to (null = ainda em vigor na data da conferência); o cálculo escolhe o bloco pelo mês de referência, nunca pela data de hoje. Em regras antigas cuja data de início não foi conferida, valid_from indica o início do período coberto por este arquivo (2025-01-01).",
+  "updated_at": "2026-11-18",
+  "disclaimer": "Tabelas tributárias usadas pelas estimativas do nfsetable (pró-labore, MEI, Simples Nacional e Lucro Presumido). Conferidas na fonte primária em 29/09/2026 e, as regras de 2027 em diante, em 18/11/2026, exceto os blocos com \"unverified\": true. Não substituem um contador. Valores monetários em reais, taxas em decimal (0.06 = 6%), datas em AAAA-MM-DD. Cada bloco vale de valid_from a valid_to (null = ainda em vigor na data da conferência); o cálculo escolhe o bloco pelo mês de referência, nunca pela data de hoje. Em regras antigas cuja data de início não foi conferida, valid_from indica o início do período coberto por este arquivo (2025-01-01).",
   "coverage": {
     "valid_from": "2025-01-01",
-    "valid_to": "2026-12-31",
+    "valid_to": "2027-12-31",
     "before_note": "As tabelas anteriores a 2025 (salário mínimo, INSS, IRRF, DAS-MEI) não estão incluídas.",
-    "after_note": "As regras de 2027 em diante ainda não estão incluídas: nova janela do RBT12 e do Fator R, IBS e CBS no lugar de PIS e Cofins, novas tabelas do Simples Nacional e novos valores de salário mínimo, INSS e IRRF."
+    "after_note": "As regras de 2028 em diante estão incompletas: faltam salário mínimo, INSS, o Lucro Presumido com CBS e IBS e, a partir de 2029, as tabelas do Simples Nacional da troca do ISS pelo IBS.",
+    "pending": {
+      "minimum_wage": "O salário mínimo de 2027 ainda não foi publicado: o DAS-MEI e o pró-labore usam o de 2026.",
+      "inss": "O teto do INSS de 2027 ainda não foi publicado.",
+      "presumido": "Em 2027 o PIS e a Cofins acabam e entram a CBS e o IBS (LC 214/2025); a alíquota da CBS de 2027 depende de resolução do Senado, então o Lucro Presumido ainda usa o PIS e a Cofins de 2026."
+    }
   },
   "minimum_wage": [
     {

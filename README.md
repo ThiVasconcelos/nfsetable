@@ -108,7 +108,8 @@ It runs on Windows, Linux and macOS and is built with Tauri 2, Rust, PDFium and 
   one (for example, a synced folder for backups).
 - CNAE (activity code) picker with the annex rule of each IT activity.
 
-The tax tables cover 2025 and 2026 and live in
+The tax tables cover 2025 to 2027 (the 2027 minimum wage, INSS ceiling and Lucro Presumido are
+still missing, and the app warns about them) and live in
 [crates/core/tax/br.json](crates/core/tax/br.json), where each block cites its legal basis (the app
 lists the sources under "Avisos e fontes"). Everything is an estimate for planning and **does not
 replace an accountant**.
