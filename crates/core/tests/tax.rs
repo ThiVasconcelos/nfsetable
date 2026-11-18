@@ -590,6 +590,38 @@ fn iss_cap_in_annex_iii_bracket_5() {
 }
 
 #[test]
+fn iss_cap_in_annex_iii_bracket_5_in_2027() {
+    // The 2026 case above with the 2027 tables (April 2026 to March 2027 at 250.000,00): 16,812%,
+    // DAS 42.030,00, ISS capped at 5% = 12.500,00 and the other 29.530,00 split by the 2027 excess
+    // rule: IRPJ 6,02% = 1.777,706 → 1.777,71; CSLL 5,26% = 1.553,278 → 1.553,28; CBS 23,20% =
+    // 6.850,96; CPP 65,26% = 19.271,278 → 19.271,28; IBS 0,26% = 76,778 → 76,78. The rounded parts
+    // sum to 42.030,01: the extra cent comes off the largest share, CPP (19.271,27). The ISS keeps
+    // its column, before the IBS.
+    let mut data = input("2027-03", months("2026-04", 12, 25_000_000));
+    data.activity = SimplesActivity::AnnexIii;
+    let report = tax_report(&data).unwrap();
+    let simples = &report.simples;
+    assert_eq!(simples.bracket, 5);
+    assert_eq!(simples.das_cents, 4_203_000);
+    let split: Vec<(&str, i64)> = simples
+        .split
+        .iter()
+        .map(|s| (s.tax.as_str(), s.cents))
+        .collect();
+    assert_eq!(
+        split,
+        [
+            ("irpj", 177_771),
+            ("csll", 155_328),
+            ("cbs", 685_096),
+            ("cpp", 1_927_127),
+            ("iss", 1_250_000),
+            ("ibs", 7_678)
+        ]
+    );
+}
+
+#[test]
 fn sixth_bracket_and_above_the_ceiling() {
     let report = tax_report(&input("2026-09", months("2025-10", 12, 35_000_000))).unwrap();
     // RBT12 4.200.000 → bracket 6: (4.200.000 × 33% − 648.000) / 4.200.000 = 17,5714…%;

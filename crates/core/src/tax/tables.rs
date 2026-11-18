@@ -721,7 +721,8 @@ fn check_annex(name: &str, annex: &AnnexTable) -> Result<(), String> {
     Ok(())
 }
 
-fn share_sum(shares: &[(String, Option<Decimal>)]) -> Decimal {
+/// Sum of the shares that are inside the DAS (`None` ones are left out).
+pub(crate) fn share_sum(shares: &[(String, Option<Decimal>)]) -> Decimal {
     shares.iter().filter_map(|(_, share)| *share).sum()
 }
 
@@ -760,13 +761,16 @@ fn shares<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Shares, D::Error
         .collect::<Result<Vec<_>, String>>()
         .map_err(de::Error::custom)?;
     // Stable: unknown taxes keep the alphabetical order of the map.
-    shares.sort_by_key(|(tax, _)| {
-        TAX_ORDER
-            .iter()
-            .position(|known| known == tax)
-            .unwrap_or(TAX_ORDER.len())
-    });
+    shares.sort_by_key(|(tax, _)| tax_rank(tax));
     Ok(shares)
+}
+
+/// Position of `tax` in the canonical order of a split; unknown taxes go last.
+pub(crate) fn tax_rank(tax: &str) -> usize {
+    TAX_ORDER
+        .iter()
+        .position(|known| *known == tax)
+        .unwrap_or(TAX_ORDER.len())
 }
 
 /// An optional `{ "tax": share }` object (see `shares`).

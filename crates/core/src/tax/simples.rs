@@ -1,7 +1,7 @@
 //! Simples Nacional: Fator R, annex, bracket, effective rate, DAS and its split by tax.
 
 use super::money::{round_money, trunc2};
-use super::tables::{AnnexTable, Shares, Simples, SimplesBracket};
+use super::tables::{share_sum, tax_rank, AnnexTable, Shares, Simples, SimplesBracket};
 use crate::model::SimplesActivity;
 use rust_decimal::Decimal;
 
@@ -140,9 +140,10 @@ pub(crate) fn das(simples: &Simples, annex: Annex, rbt12: Decimal, revenue: Deci
 /// Each tax gets revenue × effective rate × its share (LC 123/2006, art. 18, § 1º-B). The
 /// effective ISS is capped (5%): above the cap, the ISS stays at the cap and the rest of the
 /// effective rate is split by `iss_excess_split`, or, when the annex has none, among the other
-/// taxes in proportion to their shares in the bracket (the rule the published splits follow).
-/// Each amount is rounded to the cent and the rounding difference goes to the largest share (by
-/// its exact amount, i.e. the tax with the largest percentage), so the split adds up to the DAS.
+/// taxes in proportion to their shares in the bracket (LC 123/2006, art. 18, § 1º-B, I, included by
+/// LC 227/2026; the published splits follow it). The parts keep the canonical tax order. Each
+/// amount is rounded to the cent and the rounding difference goes to the largest share (by its
+/// exact amount, i.e. the tax with the largest percentage), so the split adds up to the DAS.
 fn split(
     table: &AnnexTable,
     bracket: &SimplesBracket,
@@ -169,6 +170,7 @@ fn split(
                 None => apply(&without_iss(&bracket.split), excess),
             };
             parts.push(("iss".to_string(), revenue * table.iss_cap));
+            parts.sort_by_key(|(tax, _)| tax_rank(tax));
             parts
         }
         _ => apply(&bracket.split, effective_rate),
@@ -196,7 +198,7 @@ fn without_iss(split: &[(String, Option<Decimal>)]) -> Shares {
         .filter(|(tax, _)| tax != "iss")
         .cloned()
         .collect();
-    let total: Decimal = others.iter().filter_map(|(_, share)| *share).sum();
+    let total = share_sum(&others);
     others
         .into_iter()
         .map(|(tax, share)| (tax, share.map(|share| share / total)))
