@@ -3,7 +3,7 @@
 
 use super::mei;
 use super::money::{brl, percent, ratio, to_cents, to_f64};
-use super::month::Month;
+use super::month::{Date, Month};
 use super::payroll::{self, ProLaboreTaxes};
 use super::revenue::Revenue;
 use super::scenarios::{
@@ -20,21 +20,95 @@ use crate::model::{
 use crate::text::count_label;
 use rust_decimal::Decimal;
 
+/// A gap in the tables of a month: outside the months covered, or a table not in force (label,
+/// start of the version used, note).
+#[derive(PartialEq)]
+enum Gap {
+    Coverage(CoverageStatus),
+    Table(&'static str, Date, Option<&'static str>),
+}
+
+/// Warnings about the tables of the reference month and, since each month of the cash flow uses
+/// its own tables, about the other months considered: once per gap the reference month does not
+/// have, naming the months it affects.
+pub(crate) fn coverage_warnings(
+    data: &'static TaxData,
+    tables: &Tables,
+    reference: Month,
+    months: impl IntoIterator<Item = Month>,
+    warnings: &mut Vec<String>,
+) {
+    reference_coverage_warnings(tables, reference, warnings);
+    let reference_gaps: Vec<Gap> = tables
+        .fallbacks
+        .iter()
+        .map(|f| Gap::Table(f.label, f.used_from, f.note))
+        .collect();
+    let mut groups: Vec<(Gap, Vec<Month>)> = Vec::new();
+    for month in months.into_iter().filter(|m| *m != reference) {
+        let month_tables = data.tables(month);
+        let gaps = match month_tables.coverage {
+            CoverageStatus::Within => month_tables
+                .fallbacks
+                .iter()
+                .map(|f| Gap::Table(f.label, f.used_from, f.note))
+                .filter(|gap| !reference_gaps.contains(gap))
+                .collect(),
+            status if status == tables.coverage => Vec::new(),
+            status => vec![Gap::Coverage(status)],
+        };
+        for gap in gaps {
+            match groups.iter_mut().find(|(known, _)| *known == gap) {
+                Some((_, affected)) => affected.push(month),
+                None => groups.push((gap, vec![month])),
+            }
+        }
+    }
+    for (gap, affected) in groups {
+        let label = match affected.as_slice() {
+            [only] => only.display(),
+            [first, .., last] => format!("{} a {}", first.display(), last.display()),
+            [] => continue,
+        };
+        warnings.push(match gap {
+            Gap::Coverage(CoverageStatus::Before(first, note)) => format!(
+                "{note} O fluxo mês a mês de {label} (antes de {first}) usa as tabelas mais \
+                 próximas e pode não refletir as regras da época."
+            ),
+            Gap::Coverage(CoverageStatus::After(last, note)) => format!(
+                "{note} O fluxo mês a mês de {label} (depois de {last}) usa as tabelas mais \
+                 recentes incluídas."
+            ),
+            Gap::Coverage(CoverageStatus::Within) => continue,
+            Gap::Table(table, used_from, note) => fallback_warning(&label, table, used_from, note),
+        });
+    }
+}
+
+/// "Tabela não incluída para <months>: <table>; foi usada a versão vigente a partir de <date>."
+fn fallback_warning(
+    months: &str,
+    table: &str,
+    used_from: Date,
+    note: Option<&'static str>,
+) -> String {
+    let note = note.map(|note| format!(" {note}")).unwrap_or_default();
+    format!(
+        "Tabela não incluída para {months}: {table}; foi usada a versão vigente a partir de \
+         {used_from}.{note}"
+    )
+}
+
 /// Warnings about the tables used for the reference month.
-pub(crate) fn coverage_warnings(tables: &Tables, reference: Month, warnings: &mut Vec<String>) {
+fn reference_coverage_warnings(tables: &Tables, reference: Month, warnings: &mut Vec<String>) {
     match tables.coverage {
         CoverageStatus::Within => {
             for fallback in &tables.fallbacks {
-                let note = fallback
-                    .note
-                    .map(|note| format!(" {note}"))
-                    .unwrap_or_default();
-                warnings.push(format!(
-                    "Tabela não incluída para {}: {}; foi usada a versão vigente a partir de \
-                     {}.{note}",
-                    reference.display(),
+                warnings.push(fallback_warning(
+                    &reference.display(),
                     fallback.label,
-                    fallback.used_from
+                    fallback.used_from,
+                    fallback.note,
                 ));
             }
         }

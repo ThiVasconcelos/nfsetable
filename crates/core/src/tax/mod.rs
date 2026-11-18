@@ -53,7 +53,13 @@ pub fn tax_report(input: &TaxInput) -> Result<TaxReport, CoreError> {
         return Ok(report::zero_report(&normalized, warnings));
     }
     let tables = data.tables(normalized.reference);
-    report::coverage_warnings(&tables, normalized.reference, &mut warnings);
+    report::coverage_warnings(
+        data,
+        &tables,
+        normalized.reference,
+        months.keys().copied(),
+        &mut warnings,
+    );
     let revenue = revenue::summarize(months, normalized.reference);
     Ok(report::build(
         &normalized,

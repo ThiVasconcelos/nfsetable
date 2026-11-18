@@ -1023,6 +1023,24 @@ fn reference_month_outside_the_tables() {
         "As regras de 2028 em diante estão incompletas"
     ));
 
+    // Months of the cash flow outside the tables get their own warning, once: here 11/2024 and
+    // 12/2024, which use the 2025 DAS-MEI (75,90 + 5,00 = 80,90).
+    let mut tax = input("2025-02", months("2024-11", 4, 500_000));
+    tax.regime = TaxRegime::Mei;
+    let report = tax_report(&tax).unwrap();
+    let das: Vec<i64> = report
+        .cash_flow
+        .iter()
+        .map(|m| m.company_taxes_cents)
+        .collect();
+    assert_eq!(das, [8_090, 8_090, 8_090, 8_090]);
+    let flow_warnings: Vec<&String> = report
+        .warnings
+        .iter()
+        .filter(|w| w.contains("O fluxo mês a mês de 11/2024 a 12/2024 (antes de 01/01/2025)"))
+        .collect();
+    assert_eq!(flow_warnings.len(), 1, "{:?}", report.warnings);
+
     let report = tax_report(&input("2024-06", months("2024-04", 3, 500_000))).unwrap();
     // Uses the nearest (2025) tables: minimum wage 1.518,00.
     assert_eq!(report.pro_labore.gross_cents, 151_800);
