@@ -162,7 +162,8 @@
       </p>
       {#if pl.automatic && regime !== 'presumido'}
         <p class="basis-note">
-          O RBT12 de cada mês é a receita dos 12 meses antes dele que o app conhece (proporcional quando são menos de 12).
+          O RBT12 de cada mês é a receita dos 12 meses antes dele que o app conhece (a partir de 2027, dos 12 meses antes do
+          mês anterior; proporcional quando são menos de 12).
         </p>
       {/if}
     </TaxCard>
@@ -192,7 +193,7 @@
             <th scope="col" class="c-month">Mês</th>
             <th scope="col" class="c-num">Receita</th>
             {#if simples}
-              <th scope="col" class="c-num" title="Receita dos 12 meses anteriores">RBT12</th>
+              <th scope="col" class="c-num" title="Receita dos 12 meses anteriores (a partir de 2027, dos 12 anteriores ao mês anterior)">RBT12</th>
               <th scope="col" class="c-num">Fator R</th>
               <th scope="col" class="c-annex">Anexo</th>
               {#if fatorR}<th scope="col" class="c-num c-min">Mínimo p/ Anexo III</th>{/if}

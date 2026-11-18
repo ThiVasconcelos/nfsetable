@@ -13,7 +13,8 @@
 //   linked to a type of note: expense rows of that type confirm the item (planned × real) instead
 //   of adding up as variable costs.
 // - The revenue of every month of "Receitas e projeção" (`revenueHistory`): the RBT12 of each month
-//   of the cash flow (and the automatic pró-labore) looks at the 12 months before it.
+//   of the cash flow (and the automatic pró-labore) looks at the 12 months before it (from 2027,
+//   before the previous month).
 // - The CNAE catalog and the report computed by the backend (`tax_report`, debounced).
 //
 // Revenue of the notes: only revenue rows that count towards the total (no duplicates, no cancelled
@@ -546,7 +547,8 @@ export class TaxStore {
   emptyMonths = $derived(this.planMonths.filter((m) => m.included && m.cents == null))
   /**
    * Every month of "Receitas e projeção" with a value (each with its chosen source), included or
-   * not: the RBT12 of each month of the cash flow looks at the 12 months before it.
+   * not: the RBT12 of each month of the cash flow looks at the 12 months before it (from 2027,
+   * before the previous month).
    */
   revenueHistory = $derived<MonthAmount[]>(
     this.planMonths.filter((m) => m.cents != null).map((m) => ({ month: m.month, cents: m.cents ?? 0 })),

@@ -86,9 +86,9 @@ It runs on Windows, Linux and macOS and is built with Tauri 2, Rust, PDFium and 
   - in the Simples, the tab also shows each month's **Fator R** (payroll divided by revenue over
     12 months; at 28% or more, activities such as software development are taxed in Anexo III
     instead of the higher-rate Anexo V), computed from the actual revenue of the 12 months before
-    it, and the minimum pró-labore that keeps that month in Anexo III. The automatic pró-labore is
-    the smallest amount that keeps every month considered in Anexo III (never below the minimum
-    wage).
+    it (from 2027, of the 12 months before the previous one), and the minimum pró-labore that
+    keeps that month in Anexo III. The automatic pró-labore is the smallest amount that keeps every
+    month considered in Anexo III (never below the minimum wage).
 
   The calculation assumes the pró-labore was paid in all of those months; the app does not model
   leaving the MEI, which is a job for your accountant.

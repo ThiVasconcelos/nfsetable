@@ -222,7 +222,8 @@ patterns nobody can review.
   expenses and profit.
 - **ME** (Simples Nacional or Lucro Presumido): a simple pró-labore card in the Resumo and a
   "Pró-labore" tab with INSS/IRRF and, in the Simples, each month's Fator R (from the revenue of
-  its 12 previous months) and the minimum pró-labore that keeps that month in Anexo III. The
+  its 12 previous months; from 2027, of the 12 before the previous month) and the minimum
+  pró-labore that keeps that month in Anexo III. The
   automatic pró-labore is the smallest amount that keeps every month considered in Anexo III.
 - **Cash flow:** each Simples month has its own RBT12, Fator R and annex (`tax/window.rs`).
 - **No MEI exit model.** The old start-of-pró-labore simulator was removed on purpose; the

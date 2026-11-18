@@ -63,7 +63,8 @@ Aponte a pasta das notas, confira os valores e veja o total da seleção. Tudo r
   - um card simples no Resumo;
   - a aba "Pró-labore", com INSS, IRRF (já com a redução da Lei 15.270/2025) e o líquido;
   - no Simples, a aba mostra também o Fator R de cada mês, calculado com a receita real dos 12
-    meses anteriores a ele, e o pró-labore mínimo que mantém aquele mês no Anexo III. O pró-labore
+    meses anteriores a ele (a partir de 2027, dos 12 meses anteriores ao mês anterior), e o
+    pró-labore mínimo que mantém aquele mês no Anexo III. O pró-labore
     automático é o menor valor que mantém todos os meses considerados no Anexo III (nunca abaixo
     do salário mínimo).
 

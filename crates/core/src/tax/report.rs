@@ -340,11 +340,15 @@ impl<'a> Estimate<'a> {
         }
         self.simples_bracket_warnings(warnings);
         if input.activity == SimplesActivity::FatorR {
-            warnings.push(
-                "O Fator R supõe pró-labore constante: o PGDAS-D usa a folha paga nos 12 meses \
-                 anteriores, então uma mudança no pró-labore leva meses para aparecer no Fator R."
-                    .to_string(),
-            );
+            let window = if self.lagged_window() {
+                "nos 12 meses anteriores (a partir de 2027, nos 12 meses anteriores ao mês anterior)"
+            } else {
+                "nos 12 meses anteriores"
+            };
+            warnings.push(format!(
+                "O Fator R supõe pró-labore constante: o PGDAS-D usa a folha paga {window}, então \
+                 uma mudança no pró-labore leva meses para aparecer no Fator R."
+            ));
         }
         if let Some(user) = input.user_pro_labore {
             if user < tables.minimum_wage && input.regime != TaxRegime::Mei {

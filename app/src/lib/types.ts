@@ -362,14 +362,15 @@ export interface TaxInput {
   openingMonth: string | null
   /**
    * Monthly pró-labore; null = automatic: the smallest amount whose Fator R reaches 28% in the
-   * typical month and in every month considered (each with the RBT12 of its 12 previous months),
-   * minus the other payroll and never below the minimum wage.
+   * typical month and in every month considered (each with the RBT12 of its window: the 12
+   * previous months, or from 2027 the 12 before the previous one), minus the other payroll and
+   * never below the minimum wage.
    */
   proLaboreCents: number | null
   /**
    * Revenue of every known month (notes and projections), not only the months considered: the RBT12
-   * of each month of the cash flow (and the automatic pró-labore) looks at the 12 months before it.
-   * The months considered are added to it.
+   * of each month of the cash flow (and the automatic pró-labore) looks at the 12 months before it
+   * (from 2027, before the previous month). The months considered are added to it.
    */
   revenueHistory: MonthAmount[]
   /** Other monthly payroll that counts for the Fator R (salaries, 13th, FGTS...). */
@@ -501,8 +502,8 @@ export interface ProLaboreReport {
   basisAverageCents: number
   basisMonths: number
   /**
-   * The month whose 12 previous months required the automatic amount (the one with the largest
-   * RBT12); null when the typical month or the minimum wage decided it.
+   * The month whose RBT12 required the automatic amount (the largest RBT12); null when the typical
+   * month or the minimum wage decided it.
    */
   basisMonth: string | null
   /** 11% up to the INSS ceiling, withheld from the partner. */
@@ -570,7 +571,7 @@ export interface LeftoverReport {
 /**
  * One month of the cash flow in the current regime: the month's own revenue, costs and pró-labore.
  * In the Simples Nacional each month also has its own RBT12 (the 12 previous months known to the
- * app), Fator R and annex.
+ * app; from 2027, the 12 before the previous month), Fator R and annex.
  */
 export interface CashFlowMonth {
   /** `yyyy-mm`. */
@@ -592,8 +593,9 @@ export interface CashFlowMonth {
   /** What the company earned: revenue − company taxes − costs − gross pró-labore. */
   profitCents: number
   /**
-   * Simples Nacional: RBT12 of the month (the 12 previous months known to the app, proportional when
-   * there are fewer, the month itself × 12 when there is none). null otherwise.
+   * Simples Nacional: RBT12 of the month (the 12 previous months known to the app, from 2027 the 12
+   * before the previous month; proportional when there are fewer, the month itself × 12 when there
+   * is none, zero in the first two months of activity from 2027). null otherwise.
    */
   rbt12Cents: number | null
   /** Simples Nacional: 12 × (pró-labore + other payroll) / RBT12, truncated like the PGDAS-D. */
