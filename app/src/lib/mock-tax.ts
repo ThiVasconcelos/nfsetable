@@ -398,7 +398,10 @@ export function mockTaxReport(input: TaxInput): TaxReport {
   const forAnnexIii = Math.max(refTables.minWage, typicalNeed, monthNeed)
   const basis = binding && monthNeed > Math.max(refTables.minWage, typicalNeed) ? binding : null
   const gross = input.proLaboreCents ?? forAnnexIii
-  const owner = ownerTaxes(gross, input.dependents, refTables)
+  // The pró-labore of the current regime, like the engine's report: in the Lucro Presumido without a
+  // typed one, one minimum wage (no Fator R); the Simples estimates keep `gross`.
+  const ownerGross = input.regime === 'presumido' ? (input.proLaboreCents ?? refTables.minWage) : gross
+  const owner = ownerTaxes(ownerGross, input.dependents, refTables)
 
   // Simples with the user's pró-labore.
   const fs12 = (gross + input.payrollCents) * 12
@@ -636,11 +639,11 @@ export function mockTaxReport(input: TaxInput): TaxReport {
       eppLimitCents: EPP_LIMIT,
     },
     proLabore: {
-      grossCents: gross,
+      grossCents: ownerGross,
       automatic,
       basisAverageCents: basis ? Math.round(basis.rbt12 / 12) : average,
       basisMonths: basis ? basis.n : count,
-      basisMonth: basis?.month ?? null,
+      basisMonth: input.regime === 'presumido' ? null : (basis?.month ?? null),
       inssCents: owner.inss,
       irrfCents: owner.irrf,
       irrfReductionCents: owner.reduction,

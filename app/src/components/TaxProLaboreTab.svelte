@@ -23,16 +23,15 @@
   const fatorR = $derived(simples && activity === 'fatorR')
 
   /**
-   * The pró-labore in use. In the Lucro Presumido with "Automático" it is one minimum wage (no
-   * Fator R): the months show it; elsewhere the report's breakdown.
+   * The pró-labore in use, at the reference month's tables (in the Lucro Presumido with "Automático",
+   * one minimum wage: there is no Fator R). Not a month of the cash flow, which has each year's tables.
    */
-  const inUse = $derived.by(() => {
-    const first = flow[0]
-    if (regime === 'presumido' && pl.automatic && first) {
-      const net = first.proLaboreCents - first.inssCents - first.irrfCents
-      return { gross: first.proLaboreCents, inss: first.inssCents, irrf: first.irrfCents, reduction: 0, net }
-    }
-    return { gross: pl.grossCents, inss: pl.inssCents, irrf: pl.irrfCents, reduction: pl.irrfReductionCents, net: pl.netCents }
+  const inUse = $derived({
+    gross: pl.grossCents,
+    inss: pl.inssCents,
+    irrf: pl.irrfCents,
+    reduction: pl.irrfReductionCents,
+    net: pl.netCents,
   })
   const discounts = $derived(inUse.inss + inUse.irrf)
   const netShare = $derived(inUse.gross > 0 ? Math.max(0, inUse.net) / inUse.gross : 1)

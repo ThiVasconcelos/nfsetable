@@ -19,16 +19,11 @@
   let { proLabore: pl, regime, activity, simples, flow, ondetails }: Props = $props()
 
   /**
-   * The pró-labore in use: the report's, except in the Lucro Presumido, where the months show the one
-   * it uses (one minimum wage when automatic: there is no Fator R).
+   * The pró-labore in use, at the reference month's tables: the report's (in the Lucro Presumido, one
+   * minimum wage when automatic: there is no Fator R). Not a month of the cash flow: each month there
+   * has the tables of its own year.
    */
-  const inUse = $derived.by(() => {
-    const first = flow[0]
-    if (regime === 'presumido' && first) {
-      return { gross: first.proLaboreCents, owner: first.inssCents + first.irrfCents, net: first.proLaboreCents - first.inssCents - first.irrfCents }
-    }
-    return { gross: pl.grossCents, owner: pl.inssCents + pl.irrfCents, net: pl.netCents }
-  })
+  const inUse = $derived({ gross: pl.grossCents, owner: pl.inssCents + pl.irrfCents, net: pl.netCents })
   const fatorR = $derived(regime === 'simples' && activity === 'fatorR')
   const monthsV = $derived(flow.filter((m) => m.annex === 'V').length)
 </script>
