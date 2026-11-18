@@ -710,6 +710,19 @@ fn the_rbt12_window_skips_the_previous_month_from_2027() {
         .sources
         .iter()
         .any(|s| s.contains("redação da Res. CGSN 190/2026")));
+
+    // The same history with 2.000,00 in the months considered: the typical month (RBT12 24.000)
+    // needs less than a minimum wage, so the automatic pró-labore comes from the most demanding
+    // month, 2027-05: 2026-04 to 2027-03 = 8 × 5.000 + 2.000 + 2.000 + 2 × 20.000 = 84.000 →
+    // 28% × 7.000 = 1.960,00 (the 12 previous months, 99.000, would give 2.310,00).
+    tax.revenue_by_month = [months("2026-12", 2, 200_000), months("2027-05", 1, 200_000)].concat();
+    let report = tax_report(&tax).unwrap();
+    let rbt12: Vec<Option<i64>> = report.cash_flow.iter().map(|m| m.rbt12_cents).collect();
+    assert_eq!(rbt12, [Some(6_000_000), Some(6_000_000), Some(8_400_000)]);
+    let pl = &report.pro_labore;
+    assert_eq!(pl.gross_cents, 196_000);
+    assert_eq!(pl.basis_month.as_deref(), Some("2027-05"));
+    assert_eq!((pl.basis_average_cents, pl.basis_months), (700_000, 12));
 }
 
 #[test]

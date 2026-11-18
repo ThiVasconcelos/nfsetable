@@ -382,14 +382,14 @@ export function mockTaxReport(input: TaxInput): TaxReport {
 
   // Pró-labore of the user's choice. Automatic: the least that keeps the typical month and every
   // month considered in Anexo III (28% of its RBT12 / 12, minus the other payroll), at least the
-  // minimum wage of each of them. The binding month (ties: the latest) explains it when it decides.
+  // minimum wage. The binding month (ties: the latest) explains it when it decides.
   const automatic = input.proLaboreCents == null
   const typicalNeed = annexIiiNeed(rbt12, input.payrollCents)
   let monthNeed = -Infinity
   let binding: { month: string; rbt12: number; n: number } | null = null
   for (const m of months) {
     const w = rbt12Of(m.month, m.cents)
-    const need = Math.max(annexIiiNeed(w.rbt12, input.payrollCents), tablesFor(m.month).minWage)
+    const need = annexIiiNeed(w.rbt12, input.payrollCents)
     if (need >= monthNeed) {
       monthNeed = need
       binding = { month: m.month, ...w }
