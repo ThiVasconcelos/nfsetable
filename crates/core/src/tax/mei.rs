@@ -91,6 +91,35 @@ mod tests {
     }
 
     #[test]
+    fn limits_of_lc_238() {
+        // LC 238/2026: R$ 110.000,00 in 2027 (9.166,67 a month in the opening year) and
+        // R$ 140.000,00 from 2028 on (11.666,67 a month).
+        let reference = month("2027-09");
+        let tables = tables_for("2027-09");
+        assert_eq!(limit(&tables, reference, None), dec!(110000));
+        // Opened in September 2027: 4 months × 9.166,67 = 36.666,68.
+        assert_eq!(
+            limit(&tables, reference, Some(month("2027-09"))),
+            dec!(36666.68)
+        );
+        let reference = month("2028-03");
+        let tables = tables_for("2028-03");
+        assert_eq!(
+            limit(&tables, reference, Some(month("2027-05"))),
+            dec!(140000)
+        );
+        // Opened in March 2028: 10 months × 11.666,67 = 116.666,70.
+        assert_eq!(
+            limit(&tables, reference, Some(month("2028-03"))),
+            dec!(116666.70)
+        );
+        assert!(tables_for("2031-01")
+            .fallbacks
+            .iter()
+            .all(|f| f.label != "MEI"));
+    }
+
+    #[test]
     fn status_bands() {
         let tolerance = dec!(0.2);
         assert_eq!(

@@ -449,6 +449,43 @@ fn mei_opened_in_july() {
 }
 
 #[test]
+fn mei_limit_of_2027() {
+    // LC 238/2026: R$ 110.000,00 in 2027; up to 20% above (R$ 132.000,00) the company leaves the
+    // MEI the next year, beyond it retroactively.
+    let status = |revenue: Vec<MonthAmount>, reference: &str| {
+        let mut tax = input(reference, revenue);
+        tax.regime = TaxRegime::Mei;
+        tax.activity = SimplesActivity::AnnexIii;
+        let report = tax_report(&tax).unwrap();
+        assert_eq!(report.mei.limit_cents, 11_000_000);
+        (report.mei.year_to_date_cents, report.mei.status)
+    };
+    // 11 × 10.000,00 = 110.000,00 up to November: still within.
+    assert_eq!(
+        status(months("2027-01", 11, 1_000_000), "2027-11"),
+        (11_000_000, MeiStatus::Within)
+    );
+    // One cent more: 110.000,01, within the 20% tolerance.
+    let mut revenue = months("2027-01", 11, 1_000_000);
+    revenue[10].cents += 1;
+    assert_eq!(
+        status(revenue, "2027-11"),
+        (11_000_001, MeiStatus::UpToTolerance)
+    );
+    // 12 × 11.000,00 = 132.000,00: the last amount of the tolerance.
+    assert_eq!(
+        status(months("2027-01", 12, 1_100_000), "2027-12"),
+        (13_200_000, MeiStatus::UpToTolerance)
+    );
+    let mut revenue = months("2027-01", 12, 1_100_000);
+    revenue[11].cents += 1;
+    assert_eq!(
+        status(revenue, "2027-12"),
+        (13_200_001, MeiStatus::AboveTolerance)
+    );
+}
+
+#[test]
 fn pro_labore_of_10000() {
     let mut data = input("2026-09", months("2025-10", 12, 5_000_000));
     data.pro_labore_cents = Some(1_000_000);

@@ -9,7 +9,7 @@
   import MonthInput from './MonthInput.svelte'
 
   const REGIMES: { id: TaxRegime; hint: string }[] = [
-    { id: 'mei', hint: 'DAS fixo, até R$ 81 mil por ano' },
+    { id: 'mei', hint: 'DAS fixo e limite de faturamento por ano' },
     { id: 'simples', hint: 'ME até R$ 360 mil por ano' },
     { id: 'presumido', hint: 'IRPJ, CSLL, PIS, Cofins e ISS' },
   ]

@@ -87,9 +87,37 @@
     {
       "source": "LC 123/2006, art. 18-A, §§ 1º, 2º, 4º, I, 7º, III e IV, e 10; Res. CGSN 140/2018, art. 100-A, VI",
       "valid_from": "2018-01-01",
-      "valid_to": null,
+      "valid_to": "2026-12-31",
       "annual_limit": 81000.00,
       "opening_year_monthly_limit": 6750.00,
+      "tolerance_ratio": 0.20,
+      "it_services_allowed": false,
+      "tax_free_distribution": {
+        "source": "LC 123/2006, art. 14; Res. CGSN 140/2018, art. 145, § 3º (32% da receita de serviços)",
+        "presumption": 0.32,
+        "unverified": true
+      }
+    },
+    {
+      "source": "LC 238/2026, art. 2º e parágrafo único (limite de 2027, se a renúncia de receita constar da lei orçamentária, art. 3º); LC 123/2006, art. 18-A, §§ 4º, I, 7º, III e IV, e 10; Res. CGSN 140/2018, art. 100-A, VI",
+      "valid_from": "2027-01-01",
+      "valid_to": "2027-12-31",
+      "annual_limit": 110000.00,
+      "opening_year_monthly_limit": 9166.67,
+      "tolerance_ratio": 0.20,
+      "it_services_allowed": false,
+      "tax_free_distribution": {
+        "source": "LC 123/2006, art. 14; Res. CGSN 140/2018, art. 145, § 3º (32% da receita de serviços)",
+        "presumption": 0.32,
+        "unverified": true
+      }
+    },
+    {
+      "source": "LC 123/2006, art. 18-A, §§ 1º e 2º (redação da LC 238/2026, art. 1º, com efeitos a partir de 2028 pelo art. 10, I, se a renúncia de receita constar da lei orçamentária, art. 3º), 4º, I, 7º, III e IV, e 10; Res. CGSN 140/2018, art. 100-A, VI",
+      "valid_from": "2028-01-01",
+      "valid_to": null,
+      "annual_limit": 140000.00,
+      "opening_year_monthly_limit": 11666.67,
       "tolerance_ratio": 0.20,
       "it_services_allowed": false,
       "tax_free_distribution": {

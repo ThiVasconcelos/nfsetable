@@ -74,18 +74,21 @@ interface Tables {
   annex: Record<'III' | 'V', Bracket[]>
 }
 
+const TABLES_2026: Tables = {
+  from: '2026-01',
+  minWage: 162_100,
+  inssCeiling: 847_555,
+  meiAnnualLimit: 8_100_000,
+  meiOpeningMonthlyLimit: 675_000,
+  meiDasFixed: { iss: 500 },
+  annex: ANNEX_2026,
+}
+/** LC 238/2026: the MEI limit goes to R$ 110 mil in 2027 and R$ 140 mil from 2028 on. */
+const TABLES_2027: Tables = { ...TABLES_2026, from: '2027-01', meiAnnualLimit: 11_000_000, meiOpeningMonthlyLimit: 916_667 }
+const TABLES_2028: Tables = { ...TABLES_2027, from: '2028-01', meiAnnualLimit: 14_000_000, meiOpeningMonthlyLimit: 1_166_667 }
+
 /** Oldest first. */
-const TABLES: Tables[] = [
-  {
-    from: '2026-01',
-    minWage: 162_100,
-    inssCeiling: 847_555,
-    meiAnnualLimit: 8_100_000,
-    meiOpeningMonthlyLimit: 675_000,
-    meiDasFixed: { iss: 500 },
-    annex: ANNEX_2026,
-  },
-]
+const TABLES: Tables[] = [TABLES_2026, TABLES_2027, TABLES_2028]
 
 /** The tables of `month` (yyyy-mm): the latest that started by then, the first ones before them. */
 function tablesFor(month: string): Tables {
@@ -527,7 +530,7 @@ export function mockTaxReport(input: TaxInput): TaxReport {
       `Fator R de ${formatPercent(fatorR)} (abaixo de 28%): Anexo V. Com pró-labore de ${formatBRLPlain(forAnnexIii)} por mês, a empresa vai para o Anexo III.`,
     )
   if (projectedStatus !== 'within')
-    warnings.push('No ritmo atual, o faturamento do ano passa do limite do MEI (R$ 81 mil).')
+    warnings.push(`No ritmo atual, o faturamento do ano passa do limite do MEI (${formatBRLPlain(limit)}).`)
   warnings.push('Não considera retenções na fonte (IRRF, CSRF, ISS retido), 13º, férias nem outras receitas.')
   warnings.push(
     `Tabelas de ${refTables.from.slice(0, 4)}: salário mínimo de ${formatBRLPlain(refTables.minWage)} e teto do INSS de ${formatBRLPlain(refTables.inssCeiling)}.`,
