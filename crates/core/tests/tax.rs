@@ -726,6 +726,53 @@ fn the_rbt12_window_skips_the_previous_month_from_2027() {
 }
 
 #[test]
+fn opening_of_activity_in_2027() {
+    // Opened in March 2027 (Res. CGSN 140/2018, art. 22, § 2º, and art. 26, § 6º, as amended by
+    // Res. CGSN 190/2026), no pró-labore: 10.000,00 in March, 20.000,00 in April, 10.000,00 in May.
+    let mut tax = input(
+        "2027-05",
+        [
+            months("2027-03", 1, 1_000_000),
+            months("2027-04", 1, 2_000_000),
+            months("2027-05", 1, 1_000_000),
+        ]
+        .concat(),
+    );
+    tax.opening_month = Some("2027-03".to_string());
+    tax.pro_labore_cents = Some(0);
+    let report = tax_report(&tax).unwrap();
+    // Months 1 and 2: 1st bracket and Fator R 0,28 (Anexo III even with no payroll): 6% of
+    // 10.000 = 600,00 and of 20.000 = 1.200,00. Month 3 (May): the months before the previous one
+    // (only March) × 12 = 120.000, 1st bracket; no payroll → Fator R 0,01 → Anexo V, 15,5% of
+    // 10.000 = 1.550,00. (Each month at its own revenue × 12 would put April in the 2nd bracket.)
+    type Row<'a> = (Option<i64>, Option<f64>, Option<&'a str>, i64);
+    let flow: Vec<Row> = report
+        .cash_flow
+        .iter()
+        .map(|m| {
+            (
+                m.rbt12_cents,
+                m.fator_r,
+                m.annex.as_deref(),
+                m.company_taxes_cents,
+            )
+        })
+        .collect();
+    assert_eq!(
+        flow,
+        [
+            (Some(0), Some(0.28), Some("III"), 60_000),
+            (Some(0), Some(0.28), Some("III"), 120_000),
+            (Some(12_000_000), Some(0.01), Some("V"), 155_000),
+        ]
+    );
+    assert!(has_warning(
+        &report,
+        "nos 2 primeiros meses de atividade o PGDAS-D usa a 1ª faixa e Fator R de 28%"
+    ));
+}
+
+#[test]
 fn das_mei_with_cbs_and_ibs_in_2027() {
     let mut tax = input("2027-03", months("2027-01", 3, 500_000));
     tax.regime = TaxRegime::Mei;

@@ -247,6 +247,10 @@ pub(crate) struct Simples {
     /// The RBT12 and Fator R window of a month ends this many months before it: 1 = the 12
     /// previous months (until 2026); 2 = the 12 months before the previous one (from 2027).
     pub rbt12_window_offset: u32,
+    /// From 2027: the first months of activity are taxed at the 1st bracket with a fixed Fator R.
+    /// Until 2026 (`None`), the first month uses its own revenue × 12.
+    #[serde(default)]
+    pub opening: Option<OpeningRule>,
     #[serde(deserialize_with = "number")]
     pub fator_r_threshold: Decimal,
     /// Fator R when there is payroll but no revenue in the window.
@@ -258,6 +262,18 @@ pub(crate) struct Simples {
     pub annex_iii: AnnexTable,
     pub annex_v: AnnexTable,
     pub tax_free_distribution: Distribution,
+}
+
+/// Rule of the first months of activity (Res. CGSN 140/2018, art. 22, § 2º, I, and art. 26, § 6º,
+/// as amended by Res. CGSN 190/2026).
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct OpeningRule {
+    /// Months of activity, counting the opening month, taxed at the rates of the 1st bracket.
+    pub first_bracket_months: u32,
+    /// Fator R of those months.
+    #[serde(deserialize_with = "number")]
+    pub fator_r: Decimal,
 }
 
 #[derive(Debug, Deserialize)]

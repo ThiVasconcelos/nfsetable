@@ -94,6 +94,8 @@ interface Tables {
   annex: Record<'III' | 'V', Bracket[]>
   /** The RBT12 window ends this many months before the month (2 from 2027 on). */
   windowOffset: number
+  /** From 2027: months of activity taxed at the 1st bracket with a Fator R of 0,28. */
+  openingMonths: number
   /** pt-BR warnings on what these tables still lack. */
   pending: string[]
 }
@@ -107,6 +109,7 @@ const TABLES_2026: Tables = {
   meiDasFixed: { iss: 500 },
   annex: ANNEX_2026,
   windowOffset: 1,
+  openingMonths: 0,
   pending: [],
 }
 /** LC 238/2026: the MEI limit goes to R$ 110 mil in 2027 and R$ 140 mil from 2028 on. */
@@ -119,6 +122,7 @@ const TABLES_2027: Tables = {
   meiDasFixed: { iss: 500, cbs: 99, ibs: 1 },
   annex: ANNEX_2027,
   windowOffset: 2,
+  openingMonths: 2,
   pending: [
     'O salário mínimo e o teto do INSS de 2027 ainda não foram publicados: usados os de 2026.',
     'Em 2027 o PIS e a Cofins acabam e entram a CBS e o IBS; o Lucro Presumido ainda usa o PIS e a Cofins de 2026.',
@@ -366,7 +370,12 @@ export function mockTaxReport(input: TaxInput): TaxReport {
   const known = new Map<string, number>()
   for (const m of input.revenueHistory ?? []) known.set(m.month, (known.get(m.month) ?? 0) + m.cents)
   for (const m of months) known.set(m.month, m.cents)
+  const monthIndex = (month: string) => Number(month.slice(0, 4)) * 12 + Number(month.slice(5, 7))
+  /** One of the first months of activity taxed at the 1st bracket (from 2027). */
+  const openingRule = (month: string) =>
+    !!opening && monthIndex(month) - monthIndex(opening) >= 0 && monthIndex(month) - monthIndex(opening) < tablesFor(month).openingMonths
   const rbt12Of = (month: string, revenue: number) => {
+    if (openingRule(month)) return { rbt12: 0, n: 0 }
     let windowSum = 0
     let n = 0
     const offset = tablesFor(month).windowOffset
@@ -521,7 +530,7 @@ export function mockTaxReport(input: TaxInput): TaxReport {
     else if (input.regime === 'presumido') company = presumido(revenue, plInUse, input.issRate).total
     else {
       const { rbt12: monthRbt12 } = rbt12Of(m.month, revenue)
-      const monthFatorR = fatorROf(12 * (plInUse + input.payrollCents), monthRbt12)
+      const monthFatorR = openingRule(m.month) ? 0.28 : fatorROf(12 * (plInUse + input.payrollCents), monthRbt12)
       const monthAnnex = annexFor(input.activity, monthFatorR)
       const das = simples(monthAnnex, monthRbt12, revenue, t)
       // 6th bracket: the ISS is paid to the municipality, outside the DAS.

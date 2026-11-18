@@ -214,9 +214,9 @@ impl<'a> Estimate<'a> {
         if input.regime == TaxRegime::Simples {
             sources.push(if self.lagged_window() {
                 "RBT12 e Fator R de cada mês do fluxo (12 meses anteriores; a partir de 2027, os 12 \
-                 meses anteriores ao mês anterior; proporcional no começo da atividade): LC \
-                 123/2006, art. 18, § 1º (redação da LC 214/2025); Res. CGSN 140/2018, arts. 21, \
-                 22 e 26 (redação da Res. CGSN 190/2026)."
+                 meses anteriores ao mês anterior, com a 1ª faixa e Fator R de 0,28 nos 2 primeiros \
+                 meses de atividade): LC 123/2006, art. 18, § 1º (redação da LC 214/2025); Res. CGSN \
+                 140/2018, arts. 21, 22 e 26 (redação da Res. CGSN 190/2026)."
                     .to_string()
             } else {
                 "RBT12 e Fator R de cada mês do fluxo (12 meses anteriores; proporcional no começo \
@@ -313,14 +313,24 @@ impl<'a> Estimate<'a> {
         }
         if let Some(opening) = input.opening {
             let since = opening.months_until(input.reference);
-            if opening.year == input.reference.year || (0..12).contains(&since) {
-                warnings.push(
+            if opening.year == input.reference.year || (0..13).contains(&since) {
+                let months = match &tables.simples.opening {
+                    Some(rule) => format!(
+                        "nos {} primeiros meses de atividade o PGDAS-D usa a 1ª faixa e Fator R de \
+                         {}, e até o 13º mês a média dos meses anteriores ao mês anterior × 12",
+                        rule.first_bracket_months,
+                        percent(rule.fator_r)
+                    ),
+                    None => {
+                        "nos primeiros meses o PGDAS-D usa a receita do 1º mês × 12 e depois a \
+                             média dos meses anteriores × 12"
+                            .to_string()
+                    }
+                };
+                warnings.push(format!(
                     "Regras do início de atividade simplificadas: no ano de abertura os limites da \
-                     ME e do Simples Nacional são proporcionais aos meses de atividade, e nos \
-                     primeiros meses o PGDAS-D usa a receita do 1º mês × 12 e depois a média dos \
-                     meses anteriores × 12."
-                        .to_string(),
-                );
+                     ME e do Simples Nacional são proporcionais aos meses de atividade, e {months}."
+                ));
             }
         }
         match input.regime {
