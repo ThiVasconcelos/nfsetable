@@ -215,7 +215,7 @@ impl<'a> Estimate<'a> {
             sources.push(if self.lagged_window() {
                 "RBT12 e Fator R de cada mês do fluxo (12 meses anteriores; a partir de 2027, os 12 \
                  meses anteriores ao mês anterior, com a 1ª faixa e Fator R de 0,28 nos 2 primeiros \
-                 meses de atividade): LC 123/2006, art. 18, § 1º (redação da LC 214/2025); Res. CGSN \
+                 meses de atividade): LC 123/2006, art. 18, §§ 1º, 5º-K e 24 (redação da LC 214/2025); Res. CGSN \
                  140/2018, arts. 21, 22 e 26 (redação da Res. CGSN 190/2026)."
                     .to_string()
             } else {

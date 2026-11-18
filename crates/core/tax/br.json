@@ -11,7 +11,7 @@
     "pending": {
       "minimum_wage": "O salário mínimo de 2027 ainda não foi publicado: o DAS-MEI e o pró-labore usam o de 2026.",
       "inss": "O teto do INSS de 2027 ainda não foi publicado.",
-      "presumido": "Em 2027 o PIS e a Cofins acabam e entram a CBS e o IBS (LC 214/2025); a alíquota da CBS de 2027 depende de resolução do Senado, então o Lucro Presumido ainda usa o PIS e a Cofins de 2026."
+      "presumido": "Em 2027 o PIS e a Cofins acabam e entram a CBS e o IBS (LC 214/2025). A alíquota de referência da CBS de 2027 foi calculada pelo TCU em 11,3% e aguarda a resolução do Senado; a CBS cobrada será a referência menos 0,1 ponto, mais 0,1% de IBS. Até lá, o Lucro Presumido usa o PIS e a Cofins de 2026 (3,65%) e sai provavelmente subestimado."
     }
   },
   "minimum_wage": [
@@ -121,10 +121,24 @@
     {
       "source": "LC 123/2006, art. 18-A, §§ 1º e 2º (redação da LC 238/2026, art. 1º, com efeitos a partir de 2028 pelo art. 10, I, se a renúncia de receita constar da lei orçamentária, art. 3º), 4º, I, 7º, III e IV, e 10; Res. CGSN 140/2018, art. 100-A, VI",
       "valid_from": "2028-01-01",
+      "valid_to": "2029-12-31",
+      "annual_limit": 140000.00,
+      "opening_year_monthly_limit": 11666.67,
+      "note": "O limite de R$ 140.000,00 em 2028 e 2029 depende de a lei orçamentária considerar a renúncia de receita (LC 238/2026, art. 3º); sem isso, continua R$ 81.000,00.",
+      "tolerance_ratio": 0.20,
+      "it_services_allowed": false,
+      "tax_free_distribution": {
+        "source": "LC 123/2006, art. 14; Res. CGSN 140/2018, art. 145, § 3º (32% da receita de serviços)",
+        "presumption": 0.32,
+        "unverified": true
+      }
+    },
+    {
+      "source": "LC 123/2006, art. 18-A, §§ 1º e 2º (redação da LC 238/2026, art. 1º), 4º, I, 7º, III e IV, e 10; Res. CGSN 140/2018, art. 100-A, VI",
+      "valid_from": "2030-01-01",
       "valid_to": null,
       "annual_limit": 140000.00,
       "opening_year_monthly_limit": 11666.67,
-      "note": "O limite de R$ 140.000,00 a partir de 2028 depende de a lei orçamentária considerar a renúncia de receita (LC 238/2026, art. 3º); sem isso, continua R$ 81.000,00.",
       "tolerance_ratio": 0.20,
       "it_services_allowed": false,
       "tax_free_distribution": {
@@ -317,7 +331,7 @@
       }
     },
     {
-      "source": "LC 123/2006, art. 3º, I e II, art. 18, §§ 1º (RBT12 dos 12 meses anteriores ao mês anterior, redação da LC 214/2025, art. 517), 1º-A, 1º-B, 5º-J, 5º-M e 24, e Anexos III e V (redação da LC 214/2025, art. 519 e Anexos XX e XXII; Anexo XX com redação da LC 227/2026); Res. CGSN 140/2018, arts. 21, 22 (1ª faixa nos 2 primeiros meses de atividade, § 2º) e 26 (Fator R de 0,28 nesses meses, § 6º) e Anexos III e V (redação da Res. CGSN 190/2026). CBS e IBS no lugar de Cofins e PIS; no Anexo V não há tabela do excedente do ISS: vale o rateio proporcional do art. 18, § 1º-B, I (incluído pela LC 227/2026), e o teto de 5% não é atingido",
+      "source": "LC 123/2006, art. 3º, I e II, art. 18, §§ 1º, 5º-K e 24 (RBT12 e folha dos 12 meses anteriores ao mês anterior, redação da LC 214/2025, art. 517), 1º-A, 1º-B, 5º-J e 5º-M, e Anexos III e V (redação da LC 214/2025, art. 519 e Anexos XX e XXII; Anexo XX com redação da LC 227/2026); Res. CGSN 140/2018, arts. 21, 22 (1ª faixa nos 2 primeiros meses de atividade, § 2º) e 26 (Fator R de 0,28 nesses meses, § 6º) e Anexos III e V (redação da Res. CGSN 190/2026). CBS e IBS no lugar de Cofins e PIS; no Anexo V não há tabela do excedente do ISS: vale o rateio proporcional do art. 18, § 1º-B, I (incluído pela LC 227/2026), e o teto de 5% não é atingido",
       "valid_from": "2027-01-01",
       "valid_to": "2028-12-31",
       "me_limit": 360000.00,

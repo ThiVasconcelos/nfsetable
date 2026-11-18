@@ -500,7 +500,14 @@ fn mei_limit_of_2027() {
         (report.mei.year_to_date_cents, report.mei.status),
         (8_800_000, MeiStatus::Within)
     );
-    assert!(has_warning(&report, "R$ 140.000,00 a partir de 2028"));
+    assert!(has_warning(&report, "R$ 140.000,00 em 2028 e 2029"));
+    // The budget-law condition covers 2027 to 2029 only (LC 238/2026, art. 3º).
+    let mut tax = input("2030-12", months("2030-05", 8, 1_100_000));
+    tax.regime = TaxRegime::Mei;
+    tax.activity = SimplesActivity::AnnexIii;
+    let report = tax_report(&tax).unwrap();
+    assert_eq!(report.mei.limit_cents, 14_000_000);
+    assert!(!has_warning(&report, "lei orçamentária"));
     // No such caveat in 2026.
     let mut tax = input("2026-03", months("2026-01", 3, 500_000));
     tax.regime = TaxRegime::Mei;
@@ -995,7 +1002,7 @@ fn reference_month_outside_the_tables() {
     assert!(has_warning(&report, "INSS do pró-labore"));
     assert!(has_warning(
         &report,
-        "o Lucro Presumido ainda usa o PIS e a Cofins de 2026"
+        "o Lucro Presumido usa o PIS e a Cofins de 2026 (3,65%)"
     ));
     assert!(!has_warning(&report, "Simples Nacional;"));
 

@@ -128,7 +128,7 @@ const TABLES_2027: Tables = {
   openingMonths: 2,
   pending: [
     'O salário mínimo e o teto do INSS de 2027 ainda não foram publicados: usados os de 2026.',
-    'Em 2027 o PIS e a Cofins acabam e entram a CBS e o IBS; o Lucro Presumido ainda usa o PIS e a Cofins de 2026.',
+    'Em 2027 o PIS e a Cofins acabam e entram a CBS e o IBS; a CBS de 2027 (11,3% de referência pelo TCU) aguarda o Senado, então o Lucro Presumido ainda usa o PIS e a Cofins de 2026 e sai provavelmente subestimado.',
   ],
 }
 const TABLES_2028: Tables = {
@@ -136,7 +136,7 @@ const TABLES_2028: Tables = {
   from: '2028-01',
   meiAnnualLimit: 14_000_000,
   meiOpeningMonthlyLimit: 1_166_667,
-  meiNote: 'O limite de R$ 140.000,00 a partir de 2028 depende de a lei orçamentária considerar a renúncia de receita (LC 238/2026, art. 3º); sem isso, continua R$ 81.000,00.',
+  meiNote: 'O limite de R$ 140.000,00 em 2028 e 2029 depende de a lei orçamentária considerar a renúncia de receita (LC 238/2026, art. 3º); sem isso, continua R$ 81.000,00.',
   pending: [
     'As regras de 2028 em diante estão incompletas: faltam salário mínimo, INSS, o Lucro Presumido com CBS e IBS e, a partir de 2029, as tabelas do Simples Nacional da troca do ISS pelo IBS.',
   ],
@@ -145,10 +145,11 @@ const TABLES_2028: Tables = {
 /** DAS-MEI from 2029: the ISS falls and the IBS takes its place (no ISS from 2033). */
 const TABLES_2029_ON: Tables[] = [
   { ...TABLES_2028, from: '2029-01', meiDasFixed: { iss: 450, cbs: 100, ibs: 20 } },
-  { ...TABLES_2028, from: '2030-01', meiDasFixed: { iss: 400, cbs: 100, ibs: 40 } },
-  { ...TABLES_2028, from: '2031-01', meiDasFixed: { iss: 350, cbs: 100, ibs: 60 } },
-  { ...TABLES_2028, from: '2032-01', meiDasFixed: { iss: 300, cbs: 100, ibs: 80 } },
-  { ...TABLES_2028, from: '2033-01', meiDasFixed: { cbs: 100, ibs: 200 } },
+  // From 2030 the MEI limit no longer depends on the budget law (LC 238/2026, art. 3º).
+  { ...TABLES_2028, from: '2030-01', meiDasFixed: { iss: 400, cbs: 100, ibs: 40 }, meiNote: undefined },
+  { ...TABLES_2028, from: '2031-01', meiDasFixed: { iss: 350, cbs: 100, ibs: 60 }, meiNote: undefined },
+  { ...TABLES_2028, from: '2032-01', meiDasFixed: { iss: 300, cbs: 100, ibs: 80 }, meiNote: undefined },
+  { ...TABLES_2028, from: '2033-01', meiDasFixed: { cbs: 100, ibs: 200 }, meiNote: undefined },
 ]
 
 /** Oldest first. */
