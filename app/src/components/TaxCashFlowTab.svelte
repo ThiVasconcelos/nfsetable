@@ -116,7 +116,8 @@
     {:else if regime === 'mei'}
       Valores em R$. No MEI o imposto é o DAS fixo do mês.
     {:else}
-      Valores em R$. Impostos sobre a receita de cada mês; o pró-labore é o do resumo.
+      Valores em R$. Impostos sobre a receita de cada mês, com as tabelas daquele mês (no automático, o pró-labore é
+      o salário mínimo do mês).
     {/if}
     {#if negatives}
       <strong class="neg">{plural(negatives, 'mês ficou', 'meses ficaram')} no vermelho</strong> (sobra negativa).
