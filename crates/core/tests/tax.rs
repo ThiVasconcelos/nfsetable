@@ -623,6 +623,56 @@ fn sixth_bracket_and_above_the_ceiling() {
 }
 
 #[test]
+fn simples_tables_of_2027_have_cbs_and_ibs() {
+    // April 2026 to March 2027 at 20.000,00: RBT12 240.000, automatic pró-labore 5.600,00, Fator R
+    // 0,28 → Anexo III, bracket 2, (240.000 × 11,2% − 9.360) / 240.000 = 7,30% → DAS 1.460,00
+    // (rates unchanged in 2027). Split: IRPJ 4% = 58,40; CSLL 3,5% = 51,10; CBS 16,91% =
+    // 246,886 → 246,89; CPP 43,4% = 633,64; ISS 32% = 467,20; IBS 0,19% = 2,774 → 2,77.
+    let report = tax_report(&input("2027-03", months("2026-04", 12, 2_000_000))).unwrap();
+    let simples = &report.simples;
+    assert_eq!((simples.annex.as_str(), simples.bracket), ("III", 2));
+    assert_eq!(simples.das_cents, 146_000);
+    let split: Vec<(&str, i64)> = simples
+        .split
+        .iter()
+        .map(|s| (s.tax.as_str(), s.cents))
+        .collect();
+    assert_eq!(
+        split,
+        [
+            ("irpj", 5_840),
+            ("csll", 5_110),
+            ("cbs", 24_689),
+            ("cpp", 63_364),
+            ("iss", 46_720),
+            ("ibs", 277)
+        ]
+    );
+
+    // Anexo V with a pró-labore of one minimum wage: Fator R 0,08, bracket 2, 16,125% → DAS
+    // 3.225,00: IRPJ 23% = 741,75; CSLL 15% = 483,75; CBS 16,96% = 546,96; CPP 27,85% =
+    // 898,1625 → 898,16; ISS 17% = 548,25; IBS 0,19% = 6,1275 → 6,13; sum 3.225,00.
+    let mut data = input("2027-03", months("2026-04", 12, 2_000_000));
+    data.pro_labore_cents = Some(162_100);
+    let report = tax_report(&data).unwrap();
+    assert_eq!(report.simples.annex, "V");
+    let split: Vec<i64> = report.simples.split.iter().map(|s| s.cents).collect();
+    assert_eq!(split, [74_175, 48_375, 54_696, 89_816, 54_825, 613]);
+
+    // The 6th bracket goes from 33% to 32,90% in Anexo III: RBT12 4.200.000 →
+    // (4.200.000 × 32,9% − 648.000) / 4.200.000 = 733.800 / 4.200.000; DAS on 350.000 =
+    // 733.800 / 12 = 61.150,00 (61.500,00 in 2026), without ISS and IBS, which are paid outside.
+    let report = tax_report(&input("2027-03", months("2026-04", 12, 35_000_000))).unwrap();
+    let simples = &report.simples;
+    assert_eq!(simples.bracket, 6);
+    assert_close(simples.nominal_rate, 0.329);
+    assert_eq!(simples.das_cents, 6_115_000);
+    assert_eq!(shares_sum(&simples.split), 6_115_000);
+    let taxes: Vec<&str> = simples.split.iter().map(|s| s.tax.as_str()).collect();
+    assert_eq!(taxes, ["irpj", "csll", "cbs", "cpp"]);
+}
+
+#[test]
 fn tables_follow_the_reference_month() {
     // Pró-labore 5.600 (automatic for 20.000/month), INSS 616,00, base 4.984,00.
     let irrf = |reference: &str| {

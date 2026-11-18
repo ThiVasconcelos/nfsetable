@@ -61,6 +61,26 @@ const ANNEX_2026: Record<'III' | 'V', Bracket[]> = {
   ],
 }
 
+/** 2027–2028 (LC 214/2025, Anexos XX and XXII): CBS and IBS take the place of Cofins and PIS. */
+const ANNEX_2027: Record<'III' | 'V', Bracket[]> = {
+  III: [
+    { upTo: 18_000_000, nominal: 0.06, deduction: 0, split: { irpj: 0.04, csll: 0.035, cbs: 0.1543, cpp: 0.434, iss: 0.335, ibs: 0.0017 } },
+    { upTo: 36_000_000, nominal: 0.112, deduction: 936_000, split: { irpj: 0.04, csll: 0.035, cbs: 0.1691, cpp: 0.434, iss: 0.32, ibs: 0.0019 } },
+    { upTo: 72_000_000, nominal: 0.135, deduction: 1_764_000, split: { irpj: 0.04, csll: 0.035, cbs: 0.1641, cpp: 0.434, iss: 0.325, ibs: 0.0019 } },
+    { upTo: 180_000_000, nominal: 0.16, deduction: 3_564_000, split: { irpj: 0.04, csll: 0.035, cbs: 0.1641, cpp: 0.434, iss: 0.325, ibs: 0.0019 } },
+    { upTo: 360_000_000, nominal: 0.21, deduction: 12_564_000, split: { irpj: 0.04, csll: 0.035, cbs: 0.1543, cpp: 0.434, iss: 0.335, ibs: 0.0017 } },
+    { upTo: 480_000_000, nominal: 0.329, deduction: 64_800_000, split: { irpj: 0.3509, csll: 0.1504, cbs: 0.1929, cpp: 0.3058 } },
+  ],
+  V: [
+    { upTo: 18_000_000, nominal: 0.155, deduction: 0, split: { irpj: 0.25, csll: 0.15, cbs: 0.1696, cpp: 0.2885, iss: 0.14, ibs: 0.0019 } },
+    { upTo: 36_000_000, nominal: 0.18, deduction: 450_000, split: { irpj: 0.23, csll: 0.15, cbs: 0.1696, cpp: 0.2785, iss: 0.17, ibs: 0.0019 } },
+    { upTo: 72_000_000, nominal: 0.195, deduction: 990_000, split: { irpj: 0.24, csll: 0.15, cbs: 0.1795, cpp: 0.2385, iss: 0.19, ibs: 0.002 } },
+    { upTo: 180_000_000, nominal: 0.205, deduction: 1_710_000, split: { irpj: 0.21, csll: 0.15, cbs: 0.1894, cpp: 0.2385, iss: 0.21, ibs: 0.0021 } },
+    { upTo: 360_000_000, nominal: 0.23, deduction: 6_210_000, split: { irpj: 0.23, csll: 0.125, cbs: 0.1696, cpp: 0.2385, iss: 0.235, ibs: 0.0019 } },
+    { upTo: 480_000_000, nominal: 0.304, deduction: 54_000_000, split: { irpj: 0.351, csll: 0.1554, cbs: 0.1978, cpp: 0.2958 } },
+  ],
+}
+
 /** The tables in force from one month on, like the versioned blocks of the engine's br.json. */
 interface Tables {
   /** First month (yyyy-mm). */
@@ -84,7 +104,13 @@ const TABLES_2026: Tables = {
   annex: ANNEX_2026,
 }
 /** LC 238/2026: the MEI limit goes to R$ 110 mil in 2027 and R$ 140 mil from 2028 on. */
-const TABLES_2027: Tables = { ...TABLES_2026, from: '2027-01', meiAnnualLimit: 11_000_000, meiOpeningMonthlyLimit: 916_667 }
+const TABLES_2027: Tables = {
+  ...TABLES_2026,
+  from: '2027-01',
+  meiAnnualLimit: 11_000_000,
+  meiOpeningMonthlyLimit: 916_667,
+  annex: ANNEX_2027,
+}
 const TABLES_2028: Tables = { ...TABLES_2027, from: '2028-01', meiAnnualLimit: 14_000_000, meiOpeningMonthlyLimit: 1_166_667 }
 
 /** Oldest first. */

@@ -1,7 +1,7 @@
 //! Simples Nacional: Fator R, annex, bracket, effective rate, DAS and its split by tax.
 
 use super::money::{round_money, trunc2};
-use super::tables::{AnnexTable, Simples, SimplesBracket};
+use super::tables::{AnnexTable, Shares, Simples, SimplesBracket};
 use crate::model::SimplesActivity;
 use rust_decimal::Decimal;
 
@@ -139,9 +139,10 @@ pub(crate) fn das(simples: &Simples, annex: Annex, rbt12: Decimal, revenue: Deci
 
 /// Each tax gets revenue × effective rate × its share (LC 123/2006, art. 18, § 1º-B). The
 /// effective ISS is capped (5%): above the cap, the ISS stays at the cap and the rest of the
-/// effective rate is split by `iss_excess_split`. Each amount is rounded to the cent and the
-/// rounding difference goes to the largest share (by its exact amount, i.e. the tax with the
-/// largest percentage), so the split adds up to the DAS.
+/// effective rate is split by `iss_excess_split`, or, when the annex has none, among the other
+/// taxes in proportion to their shares in the bracket (the rule the published splits follow).
+/// Each amount is rounded to the cent and the rounding difference goes to the largest share (by
+/// its exact amount, i.e. the tax with the largest percentage), so the split adds up to the DAS.
 fn split(
     table: &AnnexTable,
     bracket: &SimplesBracket,
@@ -162,7 +163,11 @@ fn split(
     };
     let mut parts = match iss_share {
         Some(iss) if effective_rate * iss > table.iss_cap => {
-            let mut parts = apply(&table.iss_excess_split, effective_rate - table.iss_cap);
+            let excess = effective_rate - table.iss_cap;
+            let mut parts = match &table.iss_excess_split {
+                Some(shares) => apply(shares, excess),
+                None => apply(&without_iss(&bracket.split), excess),
+            };
             parts.push(("iss".to_string(), revenue * table.iss_cap));
             parts
         }
@@ -182,6 +187,20 @@ fn split(
         part.1 += remainder;
     }
     (parts, iss_share.is_none())
+}
+
+/// The shares of the taxes other than the ISS, scaled to add up to 100%.
+fn without_iss(split: &[(String, Option<Decimal>)]) -> Shares {
+    let others: Shares = split
+        .iter()
+        .filter(|(tax, _)| tax != "iss")
+        .cloned()
+        .collect();
+    let total: Decimal = others.iter().filter_map(|(_, share)| *share).sum();
+    others
+        .into_iter()
+        .map(|(tax, share)| (tax, share.map(|share| share / total)))
+        .collect()
 }
 
 #[cfg(test)]
@@ -232,6 +251,40 @@ mod tests {
                 dec!(44.53),
                 dec!(633.64),
                 dec!(467.20)
+            ]
+        );
+    }
+
+    #[test]
+    fn iss_excess_without_a_rule_goes_to_the_other_taxes_in_proportion() {
+        // Effective 21%, ISS share 50% → 10,5% > 5%: the ISS stays at 5% and the other 16% go
+        // to IRPJ and CPP as 20 : 30, i.e. 40% and 60%. On 1.000,00: ISS 50,00, IRPJ 64,00,
+        // CPP 96,00.
+        let share = |tax: &str, share: Decimal| (tax.to_string(), Some(share));
+        let bracket = SimplesBracket {
+            bracket: 1,
+            rbt12_up_to: dec!(1000000),
+            nominal_rate: dec!(0.21),
+            deduction: dec!(0),
+            split: vec![
+                share("irpj", dec!(0.2)),
+                share("cpp", dec!(0.3)),
+                share("iss", dec!(0.5)),
+            ],
+        };
+        let table = AnnexTable {
+            iss_cap: dec!(0.05),
+            iss_excess_split: None,
+            brackets: Vec::new(),
+        };
+        let (parts, outside) = split(&table, &bracket, dec!(1000), dec!(0.21), dec!(210));
+        assert!(!outside);
+        assert_eq!(
+            parts,
+            [
+                ("irpj".to_string(), dec!(64.00)),
+                ("cpp".to_string(), dec!(96.00)),
+                ("iss".to_string(), dec!(50.00))
             ]
         );
     }

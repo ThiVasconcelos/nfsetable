@@ -24,6 +24,9 @@ const TAX_ORDER: [&str; 8] = ["irpj", "csll", "cofins", "pis", "cbs", "cpp", "is
 
 static DATA: OnceLock<Result<TaxData, String>> = OnceLock::new();
 
+/// Share of each tax (e.g. in the DAS), in the canonical order; `None` = paid outside.
+pub(crate) type Shares = Vec<(String, Option<Decimal>)>;
+
 /// The embedded tables, parsed and validated once.
 pub(crate) fn data() -> Result<&'static TaxData, CoreError> {
     DATA.get_or_init(|| parse(BR_JSON))
@@ -239,9 +242,10 @@ pub(crate) struct AnnexTable {
     /// Maximum effective ISS rate inside the DAS.
     #[serde(deserialize_with = "number")]
     pub iss_cap: Decimal,
-    /// How the effective rate above the capped ISS is split among the other taxes.
-    #[serde(deserialize_with = "shares")]
-    pub iss_excess_split: Vec<(String, Option<Decimal>)>,
+    /// How the effective rate above the capped ISS is split among the other taxes. `None` when
+    /// the law has no such rule (the cap is never reached in the annex): see `simples::split`.
+    #[serde(default, deserialize_with = "optional_shares")]
+    pub iss_excess_split: Option<Shares>,
     /// Ascending by `rbt12_up_to`.
     pub brackets: Vec<SimplesBracket>,
 }
@@ -259,7 +263,7 @@ pub(crate) struct SimplesBracket {
     pub deduction: Decimal,
     /// Share of each tax in the DAS; a `null` ISS means the ISS is paid outside the DAS.
     #[serde(deserialize_with = "shares")]
-    pub split: Vec<(String, Option<Decimal>)>,
+    pub split: Shares,
 }
 
 #[derive(Debug, Deserialize)]
@@ -623,17 +627,18 @@ fn check_annex(name: &str, annex: &AnnexTable) -> Result<(), String> {
     if annex.brackets.is_empty() {
         return Err(format!("{name}: sem faixas"));
     }
-    if annex
-        .iss_excess_split
-        .iter()
-        .any(|(tax, share)| tax == "iss" || share.is_none())
-    {
-        return Err(format!(
-            "{name}: iss_excess_split não pode ter ISS nem valores nulos"
-        ));
-    }
-    if (share_sum(&annex.iss_excess_split) - Decimal::ONE).abs() > tolerance {
-        return Err(format!("{name}: iss_excess_split não soma 100%"));
+    if let Some(excess) = &annex.iss_excess_split {
+        if excess
+            .iter()
+            .any(|(tax, share)| tax == "iss" || share.is_none())
+        {
+            return Err(format!(
+                "{name}: iss_excess_split não pode ter ISS nem valores nulos"
+            ));
+        }
+        if (share_sum(excess) - Decimal::ONE).abs() > tolerance {
+            return Err(format!("{name}: iss_excess_split não soma 100%"));
+        }
     }
     for (i, bracket) in annex.brackets.iter().enumerate() {
         if bracket.bracket as usize != i + 1 {
@@ -682,9 +687,7 @@ fn optional_number<'de, D: Deserializer<'de>>(
 }
 
 /// A `{ "tax": share }` object, in the canonical tax order.
-fn shares<'de, D: Deserializer<'de>>(
-    deserializer: D,
-) -> Result<Vec<(String, Option<Decimal>)>, D::Error> {
+fn shares<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Shares, D::Error> {
     let map = BTreeMap::<String, Option<serde_json::Number>>::deserialize(deserializer)?;
     let mut shares = map
         .into_iter()
@@ -702,6 +705,11 @@ fn shares<'de, D: Deserializer<'de>>(
             .unwrap_or(TAX_ORDER.len())
     });
     Ok(shares)
+}
+
+/// An optional `{ "tax": share }` object (see `shares`).
+fn optional_shares<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<Shares>, D::Error> {
+    shares(deserializer).map(Some)
 }
 
 /// The tables of a month known to be valid (tests).
@@ -737,6 +745,15 @@ mod tests {
         let taxes: Vec<&str> = bracket.split.iter().map(|(t, _)| t.as_str()).collect();
         assert_eq!(taxes, ["irpj", "csll", "cofins", "pis", "cpp", "iss"]);
         assert_eq!(bracket.split[2].1, Some(dec!(0.1282)));
+        // 2027–2028: CBS and IBS take the place of Cofins and PIS, and the 6th bracket changes.
+        let simples = &data.tables(month("2027-06")).simples;
+        let first = &simples.annex_iii.brackets[0];
+        let taxes: Vec<&str> = first.split.iter().map(|(t, _)| t.as_str()).collect();
+        assert_eq!(taxes, ["irpj", "csll", "cbs", "cpp", "iss", "ibs"]);
+        assert_eq!(first.split[2].1, Some(dec!(0.1543)));
+        assert_eq!(simples.annex_iii.brackets[5].nominal_rate, dec!(0.329));
+        assert_eq!(simples.annex_v.brackets[5].nominal_rate, dec!(0.304));
+        assert!(simples.annex_v.iss_excess_split.is_none());
     }
 
     #[test]
@@ -744,7 +761,7 @@ mod tests {
         #[derive(Deserialize)]
         struct Split {
             #[serde(deserialize_with = "shares")]
-            split: Vec<(String, Option<Decimal>)>,
+            split: Shares,
         }
         let taxes = |json: &str| -> Vec<String> {
             let parsed: Split = serde_json::from_str(json).unwrap();
@@ -789,7 +806,7 @@ mod tests {
     #[test]
     fn falls_back_to_the_nearest_version() {
         let data = data().unwrap();
-        let later = data.tables(month("2027-03"));
+        let later = data.tables(month("2029-03"));
         assert!(matches!(later.coverage, CoverageStatus::After(_, note) if note.contains("2027")));
         assert_eq!(later.minimum_wage, dec!(1621));
         let labels: Vec<&str> = later.fallbacks.iter().map(|f| f.label).collect();
@@ -815,7 +832,11 @@ mod tests {
     fn simples_effective_rate_is_continuous_up_to_bracket_5() {
         // (RBT12 × nominal − deduction) / RBT12 must be the same on both sides of each limit.
         let data = data().unwrap();
-        for annex in [&data.simples[0].annex_iii, &data.simples[0].annex_v] {
+        let annexes = data
+            .simples
+            .iter()
+            .flat_map(|simples| [&simples.annex_iii, &simples.annex_v]);
+        for annex in annexes {
             for pair in annex.brackets[..5].windows(2) {
                 let rbt12 = pair[0].rbt12_up_to;
                 let low = (rbt12 * pair[0].nominal_rate - pair[0].deduction) / rbt12;
