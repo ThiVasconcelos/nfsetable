@@ -1071,6 +1071,56 @@ fn the_mei_has_no_pro_labore_in_the_cash_flow() {
 }
 
 #[test]
+fn the_cash_flow_uses_the_tables_of_each_month() {
+    // December 2025 and January 2026, reference January: each month at its own minimum wage.
+    let mut tax = input("2026-01", months("2025-12", 2, 500_000));
+    tax.regime = TaxRegime::Mei;
+    let report = tax_report(&tax).unwrap();
+    // DAS-MEI: 5% × 1.518 = 75,90 + 5,00 = 80,90 in 2025; 5% × 1.621 = 81,05 + 5,00 = 86,05 in
+    // 2026. The typical month uses the reference month's.
+    let das: Vec<i64> = report
+        .cash_flow
+        .iter()
+        .map(|m| m.company_taxes_cents)
+        .collect();
+    assert_eq!(das, [8_090, 8_605]);
+    assert_eq!(report.mei.das_cents, 8_605);
+
+    // Lucro Presumido with 10.000,00 a month and the pró-labore of one minimum wage.
+    tax.regime = TaxRegime::Presumido;
+    tax.revenue_by_month = months("2025-12", 2, 1_000_000);
+    let report = tax_report(&tax).unwrap();
+    // Both months: IRPJ 15% × 32% × 10.000 = 480,00; CSLL 9% × 3.200 = 288,00; PIS 65,00;
+    // Cofins 300,00; ISS 500,00 (1.633,00). CPP 20% of the month's minimum wage: 303,60 on
+    // 1.518,00 in 2025 (1.936,60) and 324,20 on 1.621,00 in 2026 (1.957,20). INSS 11%: 166,98
+    // and 178,31; no IRRF (base below 2.428,80 after the simplified discount of 607,20).
+    let flow: Vec<(i64, i64, i64, i64, i64, i64)> = report
+        .cash_flow
+        .iter()
+        .map(|m| {
+            (
+                m.company_taxes_cents,
+                m.pro_labore_cents,
+                m.inss_cents,
+                m.irrf_cents,
+                m.leftover_cents,
+                m.profit_cents,
+            )
+        })
+        .collect();
+    assert_eq!(
+        flow,
+        [
+            // Sobra 10.000 − 1.936,60 − 166,98 = 7.896,42; lucro 10.000 − 1.936,60 − 1.518.
+            (193_660, 151_800, 16_698, 0, 789_642, 654_540),
+            // Sobra 10.000 − 1.957,20 − 178,31 = 7.864,49; lucro 10.000 − 1.957,20 − 1.621.
+            (195_720, 162_100, 17_831, 0, 786_449, 642_180),
+        ]
+    );
+    assert_eq!(regime(&report, "presumido").company_taxes_cents, 195_720);
+}
+
+#[test]
 fn fixed_costs_that_start_during_the_period() {
     let revenue = months("2026-07", 3, 1_000_000);
     let mut tax = input("2026-09", revenue);

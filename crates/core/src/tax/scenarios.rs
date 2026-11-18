@@ -108,22 +108,19 @@ fn simples_cost(ctx: &Ctx, das: &Das, revenue: Decimal, pro_labore: Decimal) -> 
     }
 }
 
-fn presumido_cost(ctx: &Ctx, revenue: Decimal, pro_labore: Decimal) -> Cost {
-    let taxes = presumido::taxes(
-        ctx.tables.presumido,
-        revenue,
-        ctx.input.iss_rate,
-        pro_labore,
-    );
+/// Lucro Presumido taxes on `revenue` at `tables` (the reference month's, or each month's in the
+/// cash flow), and the taxes withheld from the pró-labore.
+fn presumido_cost(input: &Input, tables: &Tables, revenue: Decimal, pro_labore: Decimal) -> Cost {
+    let taxes = presumido::taxes(tables.presumido, revenue, input.iss_rate, pro_labore);
     Cost {
         company: taxes.shares(),
-        owner: pro_labore_taxes(pro_labore, ctx.input.dependents, ctx.tables),
+        owner: pro_labore_taxes(pro_labore, input.dependents, tables),
     }
 }
 
-/// Pró-labore assumed in the Lucro Presumido: the user's, or the minimum wage.
-fn presumido_pro_labore(ctx: &Ctx) -> Decimal {
-    ctx.input.user_pro_labore.unwrap_or(ctx.tables.minimum_wage)
+/// Pró-labore assumed in the Lucro Presumido: the user's, or the minimum wage of `tables`.
+fn presumido_pro_labore(input: &Input, tables: &Tables) -> Decimal {
+    input.user_pro_labore.unwrap_or(tables.minimum_wage)
 }
 
 /// Whether this pró-labore (plus the other payroll) brings the Fator R of the typical month to
@@ -344,7 +341,7 @@ fn band_note(ctx: &Ctx, das: &Das) -> Option<String> {
 
 fn presumido_entry(ctx: &Ctx) -> RegimeCost {
     let table = ctx.tables.presumido;
-    let pro_labore = presumido_pro_labore(ctx);
+    let pro_labore = presumido_pro_labore(ctx.input, ctx.tables);
     let origin = if ctx.input.user_pro_labore.is_some() {
         "informado"
     } else {
@@ -370,7 +367,7 @@ fn presumido_entry(ctx: &Ctx) -> RegimeCost {
     if ctx.input.payroll > Decimal::ZERO {
         note.push_str(" Não inclui os encargos patronais sobre a folha de empregados.");
     }
-    let cost = presumido_cost(ctx, ctx.revenue, pro_labore);
+    let cost = presumido_cost(ctx.input, ctx.tables, ctx.revenue, pro_labore);
     regime_cost(ctx, ("presumido", LABEL_PRESUMIDO), true, note, &cost)
 }
 
@@ -406,7 +403,8 @@ pub(crate) fn leftover(
         }
         // Presumed base minus IRPJ, CSLL, PIS and Cofins.
         TaxRegime::Presumido => {
-            let cost = presumido_cost(ctx, revenue, presumido_pro_labore(ctx));
+            let pro_labore = presumido_pro_labore(ctx.input, tables);
+            let cost = presumido_cost(ctx.input, tables, revenue, pro_labore);
             let deductible = ["irpj", "csll", "pis", "cofins"]
                 .iter()
                 .map(|tax| cost.share(tax))
@@ -433,9 +431,10 @@ pub(crate) fn leftover(
 
 // ------------------------------------------------------------------ cash flow
 
-/// Each month considered in the current regime: its own revenue, costs and pró-labore. In the
-/// Simples Nacional each month has its own RBT12, Fator R and annex (see `window`); the MEI pays the
-/// DAS-MEI and the Lucro Presumido its taxes on the month's revenue.
+/// Each month considered in the current regime: its own revenue, costs and pró-labore, at the
+/// tables of that month (not the reference month's). In the Simples Nacional each month has its own
+/// RBT12, Fator R and annex (see `window`); the MEI pays the DAS-MEI and the Lucro Presumido its
+/// taxes on the month's revenue.
 pub(crate) fn cash_flow(
     ctx: &Ctx,
     data: &'static TaxData,
@@ -449,7 +448,7 @@ pub(crate) fn cash_flow(
             let mut simples = None;
             let (company, owner) = match ctx.input.regime {
                 TaxRegime::Mei => {
-                    let cost = mei_cost(ctx.tables);
+                    let cost = mei_cost(&data.tables(*month));
                     (cost.company_total(), cost.owner)
                 }
                 TaxRegime::Simples => {
@@ -460,7 +459,9 @@ pub(crate) fn cash_flow(
                     taxes
                 }
                 TaxRegime::Presumido => {
-                    let cost = presumido_cost(ctx, revenue, presumido_pro_labore(ctx));
+                    let tables = data.tables(*month);
+                    let pro_labore = presumido_pro_labore(ctx.input, &tables);
+                    let cost = presumido_cost(ctx.input, &tables, revenue, pro_labore);
                     (cost.company_total(), cost.owner)
                 }
             };
@@ -517,10 +518,13 @@ fn pricing_scenario(ctx: &Ctx, revenue: Decimal) -> PricingScenario {
             let das = simples::das(simples, annex, rbt12, revenue);
             (simples_cost(ctx, &das, revenue, pro_labore), Some(das))
         }
-        TaxRegime::Presumido => (
-            presumido_cost(ctx, revenue, presumido_pro_labore(ctx)),
-            None,
-        ),
+        TaxRegime::Presumido => {
+            let pro_labore = presumido_pro_labore(ctx.input, ctx.tables);
+            (
+                presumido_cost(ctx.input, ctx.tables, revenue, pro_labore),
+                None,
+            )
+        }
     };
     let net = revenue - cost.total() - ctx.costs - reserve(ctx, revenue);
     PricingScenario { cost, das, net }

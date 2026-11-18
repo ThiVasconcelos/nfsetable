@@ -92,7 +92,8 @@ impl<'a> Estimate<'a> {
         // Pró-labore: the user's, or the automatic amount: the smallest that brings the Fator R to
         // 28% in the typical month (RBT12 / 12, the average when fewer than 12 months are
         // considered) and in every month considered, each with the RBT12 of its 12 previous
-        // months, so no month falls to Anexo V when its revenue is above the average.
+        // months and the tables of that month (its minimum wage), so no month falls to Anexo V
+        // when its revenue is above the average.
         let typical_basis = revenue.rbt12 / twelve;
         let typical_auto = payroll::auto_pro_labore(typical_basis, input.payroll, tables);
         let demanding = revenue
@@ -100,7 +101,9 @@ impl<'a> Estimate<'a> {
             .keys()
             .map(|month| {
                 let rbt12 = window::rbt12(input, *month);
-                let needed = payroll::auto_pro_labore(rbt12.amount / twelve, input.payroll, tables);
+                let month_tables = data.tables(*month);
+                let needed =
+                    payroll::auto_pro_labore(rbt12.amount / twelve, input.payroll, &month_tables);
                 (needed, *month, rbt12)
             })
             .max_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
