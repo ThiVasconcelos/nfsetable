@@ -673,6 +673,46 @@ fn simples_tables_of_2027_have_cbs_and_ibs() {
 }
 
 #[test]
+fn the_rbt12_window_skips_the_previous_month_from_2027() {
+    // Months considered: 2026-12, 2027-01 and 2027-05 at 10.000,00. Other known months: 2025-11 at
+    // 1.000,00, 2025-12 to 2026-11 at 5.000,00 and 2027-02 to 2027-04 at 20.000,00.
+    let considered = [
+        months("2026-12", 2, 1_000_000),
+        months("2027-05", 1, 1_000_000),
+    ]
+    .concat();
+    let mut tax = input("2027-05", considered);
+    tax.revenue_history = [
+        months("2025-11", 1, 100_000),
+        months("2025-12", 12, 500_000),
+        months("2027-02", 3, 2_000_000),
+    ]
+    .concat();
+    let report = tax_report(&tax).unwrap();
+    // PA 2026-12 (until 2026, the 12 previous months): 2025-12 to 2026-11 = 60.000.
+    // PA 2027-01 (from 2027, the 12 months before the previous one): 2025-12 to 2026-11 again.
+    // PA 2027-05: 2026-04 to 2027-03 = 8 × 5.000 + 10.000 + 10.000 + 2 × 20.000 = 100.000 (the 12
+    // previous months would give 115.000).
+    let rbt12: Vec<Option<i64>> = report.cash_flow.iter().map(|m| m.rbt12_cents).collect();
+    assert_eq!(rbt12, [Some(6_000_000), Some(6_000_000), Some(10_000_000)]);
+    // 28% × 60.000 / 12 = 1.400,00; 28% × 100.000 / 12 = 2.333,333… → 2.333,34 (rounded up).
+    let minimum: Vec<Option<i64>> = report
+        .cash_flow
+        .iter()
+        .map(|m| m.pro_labore_for_annex_iii_cents)
+        .collect();
+    assert_eq!(minimum, [Some(140_000), Some(140_000), Some(233_334)]);
+    assert!(has_warning(
+        &report,
+        "a partir de 2027, dos 12 meses anteriores ao mês anterior"
+    ));
+    assert!(report
+        .sources
+        .iter()
+        .any(|s| s.contains("redação da Res. CGSN 190/2026")));
+}
+
+#[test]
 fn tables_follow_the_reference_month() {
     // Pró-labore 5.600 (automatic for 20.000/month), INSS 616,00, base 4.984,00.
     let irrf = |reference: &str| {

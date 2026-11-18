@@ -92,6 +92,8 @@ interface Tables {
   /** Fixed amounts of the DAS-MEI of a service provider, on top of the INSS. */
   meiDasFixed: Record<string, number>
   annex: Record<'III' | 'V', Bracket[]>
+  /** The RBT12 window ends this many months before the month (2 from 2027 on). */
+  windowOffset: number
 }
 
 const TABLES_2026: Tables = {
@@ -102,6 +104,7 @@ const TABLES_2026: Tables = {
   meiOpeningMonthlyLimit: 675_000,
   meiDasFixed: { iss: 500 },
   annex: ANNEX_2026,
+  windowOffset: 1,
 }
 /** LC 238/2026: the MEI limit goes to R$ 110 mil in 2027 and R$ 140 mil from 2028 on. */
 const TABLES_2027: Tables = {
@@ -110,6 +113,7 @@ const TABLES_2027: Tables = {
   meiAnnualLimit: 11_000_000,
   meiOpeningMonthlyLimit: 916_667,
   annex: ANNEX_2027,
+  windowOffset: 2,
 }
 const TABLES_2028: Tables = { ...TABLES_2027, from: '2028-01', meiAnnualLimit: 14_000_000, meiOpeningMonthlyLimit: 1_166_667 }
 
@@ -330,7 +334,8 @@ export function mockTaxReport(input: TaxInput): TaxReport {
   }
 
   // RBT12 of each month: the known months (notes and projections, plus the months considered) among
-  // the 12 before it, from the opening; proportional when fewer, the month itself × 12 when none.
+  // the 12 of its window (from 2027, the 12 before the previous month), from the opening;
+  // proportional when fewer, the month itself × 12 when none.
   const opening = input.openingMonth
   const known = new Map<string, number>()
   for (const m of input.revenueHistory ?? []) known.set(m.month, (known.get(m.month) ?? 0) + m.cents)
@@ -338,7 +343,8 @@ export function mockTaxReport(input: TaxInput): TaxReport {
   const rbt12Of = (month: string, revenue: number) => {
     let windowSum = 0
     let n = 0
-    for (let i = 1; i <= 12; i++) {
+    const offset = tablesFor(month).windowOffset
+    for (let i = offset; i < offset + 12; i++) {
       const m = addMonths(month, -i)
       const cents = known.get(m)
       if (cents == null || (opening && m < opening)) continue

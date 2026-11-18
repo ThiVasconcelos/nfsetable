@@ -223,6 +223,9 @@ pub(crate) struct Simples {
     /// Annual revenue limit of the EPP (the ceiling of the Simples Nacional).
     #[serde(deserialize_with = "number")]
     pub epp_limit: Decimal,
+    /// The RBT12 and Fator R window of a month ends this many months before it: 1 = the 12
+    /// previous months (until 2026); 2 = the 12 months before the previous one (from 2027).
+    pub rbt12_window_offset: u32,
     #[serde(deserialize_with = "number")]
     pub fator_r_threshold: Decimal,
     /// Fator R when there is payroll but no revenue in the window.
@@ -536,6 +539,9 @@ impl TaxData {
             check_irrf(irrf)?;
         }
         for simples in &self.simples {
+            if simples.rbt12_window_offset == 0 {
+                return Err("simples: rbt12_window_offset precisa ser 1 ou mais".into());
+            }
             check_annex("simples.annex_iii", &simples.annex_iii)?;
             check_annex("simples.annex_v", &simples.annex_v)?;
         }

@@ -91,17 +91,17 @@ impl<'a> Estimate<'a> {
 
         // Pró-labore: the user's, or the automatic amount: the smallest that brings the Fator R to
         // 28% in the typical month (RBT12 / 12, the average when fewer than 12 months are
-        // considered) and in every month considered, each with the RBT12 of its 12 previous
-        // months and the tables of that month (its minimum wage), so no month falls to Anexo V
-        // when its revenue is above the average.
+        // considered) and in every month considered, each with the RBT12 of its window and the
+        // tables of that month (its minimum wage), so no month falls to Anexo V when its revenue
+        // is above the average.
         let typical_basis = revenue.rbt12 / twelve;
         let typical_auto = payroll::auto_pro_labore(typical_basis, input.payroll, tables);
         let demanding = revenue
             .months
             .keys()
             .map(|month| {
-                let rbt12 = window::rbt12(input, *month);
                 let month_tables = data.tables(*month);
+                let rbt12 = window::rbt12(input, *month, month_tables.simples);
                 let needed =
                     payroll::auto_pro_labore(rbt12.amount / twelve, input.payroll, &month_tables);
                 (needed, *month, rbt12)
@@ -210,11 +210,17 @@ impl<'a> Estimate<'a> {
         let mut sources = tables.sources.clone();
         sources.push(distribution.source_line(&format!("Lucro isento ({regime_label})")));
         if input.regime == TaxRegime::Simples {
-            sources.push(
-                "RBT12 e Fator R de cada mês do fluxo (12 meses anteriores; proporcional no começo da \
-                 atividade): Res. CGSN 140/2018, arts. 22 e 26."
-                    .to_string(),
-            );
+            sources.push(if self.lagged_window() {
+                "RBT12 e Fator R de cada mês do fluxo (12 meses anteriores; a partir de 2027, os 12 \
+                 meses anteriores ao mês anterior; proporcional no começo da atividade): LC \
+                 123/2006, art. 18, § 1º (redação da LC 214/2025); Res. CGSN 140/2018, arts. 21, \
+                 22 e 26 (redação da Res. CGSN 190/2026)."
+                    .to_string()
+            } else {
+                "RBT12 e Fator R de cada mês do fluxo (12 meses anteriores; proporcional no começo \
+                 da atividade): Res. CGSN 140/2018, arts. 22 e 26."
+                    .to_string()
+            });
         }
 
         let (das, outlook, owner) = (&self.das, &self.outlook, &self.owner);
@@ -269,6 +275,15 @@ impl<'a> Estimate<'a> {
         }
     }
 
+    /// Some month considered has the RBT12 window of 2027 on (the 12 months before the previous
+    /// one).
+    fn lagged_window(&self) -> bool {
+        self.revenue
+            .months
+            .keys()
+            .any(|month| self.data.tables(*month).simples.rbt12_window_offset > 1)
+    }
+
     /// Assumptions and limits of the estimate, only when they matter.
     fn push_warnings(&self, warnings: &mut Vec<String>) {
         let (input, tables, revenue) = (self.ctx.input, self.ctx.tables, self.revenue);
@@ -277,9 +292,14 @@ impl<'a> Estimate<'a> {
             "mês",
             "meses",
         );
+        let window = if self.lagged_window() {
+            "dos 12 meses anteriores (a partir de 2027, dos 12 meses anteriores ao mês anterior)"
+        } else {
+            "dos 12 meses anteriores"
+        };
         warnings.push(format!(
             "O mês típico usa a média de {months} ({} por mês); no fluxo mês a mês, cada mês usa \
-             a receita dos 12 meses anteriores, como o PGDAS-D.",
+             a receita {window}, como o PGDAS-D.",
             brl(revenue.average)
         ));
         if revenue.annualized {

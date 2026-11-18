@@ -102,7 +102,8 @@ It runs on Windows, Linux and macOS and is built with Tauri 2, Rust, PDFium and 
   variable costs. In the cash flow, each month has its own.
 - **Fluxo mês a mês** (month-by-month cash flow): revenue (from invoices or forecast) − taxes −
   costs − reserve = what is left each month. In the Simples, each month is computed with its own
-  RBT12 (the revenue of its 12 previous months), Fator R and annex.
+  RBT12 (the revenue of its 12 previous months; from 2027, of the 12 months before the previous
+  one), Fator R and annex.
 - Everything you type is saved as files in the app's data folder, which you can switch to another
   one (for example, a synced folder for backups).
 - CNAE (activity code) picker with the annex rule of each IT activity.

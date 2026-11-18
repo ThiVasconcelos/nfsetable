@@ -150,6 +150,7 @@
       "valid_to": "2026-12-31",
       "me_limit": 360000.00,
       "epp_limit": 4800000.00,
+      "rbt12_window_offset": 1,
       "fator_r_threshold": 0.28,
       "fator_r_without_revenue": 0.28,
       "fator_r_without_payroll": 0.01,
@@ -255,11 +256,12 @@
       }
     },
     {
-      "source": "LC 123/2006, art. 3º, I e II, art. 18, §§ 1º-A, 1º-B, 5º-J, 5º-M e 24, e Anexos III e V (redação da LC 214/2025, art. 519 e Anexos XX e XXII; Anexo XX com redação da LC 227/2026); Res. CGSN 140/2018, arts. 21, 22 e 26 e Anexos III e V (redação da Res. CGSN 190/2026). CBS e IBS no lugar de Cofins e PIS; no Anexo V a lei não reparte o ISS acima de 5%, que não é atingido",
+      "source": "LC 123/2006, art. 3º, I e II, art. 18, §§ 1º (RBT12 dos 12 meses anteriores ao mês anterior, redação da LC 214/2025, art. 517), 1º-A, 1º-B, 5º-J, 5º-M e 24, e Anexos III e V (redação da LC 214/2025, art. 519 e Anexos XX e XXII; Anexo XX com redação da LC 227/2026); Res. CGSN 140/2018, arts. 21, 22 e 26 e Anexos III e V (redação da Res. CGSN 190/2026). CBS e IBS no lugar de Cofins e PIS; no Anexo V a lei não reparte o ISS acima de 5%, que não é atingido",
       "valid_from": "2027-01-01",
       "valid_to": "2028-12-31",
       "me_limit": 360000.00,
       "epp_limit": 4800000.00,
+      "rbt12_window_offset": 2,
       "fator_r_threshold": 0.28,
       "fator_r_without_revenue": 0.28,
       "fator_r_without_payroll": 0.01,

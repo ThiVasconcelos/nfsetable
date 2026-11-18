@@ -76,7 +76,8 @@ Aponte a pasta das notas, confira os valores e veja o total da seleção. Tudo r
   No Resumo entram os custos do mês de referência (o último mês considerado): os fixos que valem
   nele, com o valor cheio, e os gastos variáveis dele. No fluxo, cada mês tem os seus.
 - **Fluxo mês a mês**: receita (das notas ou prevista) − impostos − custos − reserva = sobra de
-  cada mês. No Simples, cada mês é calculado com o próprio RBT12, Fator R e anexo.
+  cada mês. No Simples, cada mês é calculado com o próprio RBT12 (a receita dos 12 meses
+  anteriores; a partir de 2027, dos 12 meses anteriores ao mês anterior), Fator R e anexo.
 - O que você anota fica salvo em arquivos na pasta de dados do app, que você pode trocar por outra
   (por exemplo, uma pasta sincronizada para ter backup).
 - Seletor de CNAE com a regra de anexo de cada atividade de TI.
