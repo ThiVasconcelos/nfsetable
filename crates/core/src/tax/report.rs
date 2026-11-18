@@ -294,14 +294,19 @@ impl<'a> Estimate<'a> {
             "mês",
             "meses",
         );
-        let window = if self.lagged_window() {
-            "dos 12 meses anteriores (a partir de 2027, dos 12 meses anteriores ao mês anterior)"
-        } else {
-            "dos 12 meses anteriores"
+        // Only the Simples looks at an RBT12 month by month.
+        let flow = match (input.regime, self.lagged_window()) {
+            (TaxRegime::Simples, true) => {
+                "; no fluxo mês a mês, cada mês usa a receita dos 12 meses anteriores (a partir de \
+                 2027, dos 12 meses anteriores ao mês anterior), como o PGDAS-D"
+            }
+            (TaxRegime::Simples, false) => {
+                "; no fluxo mês a mês, cada mês usa a receita dos 12 meses anteriores, como o PGDAS-D"
+            }
+            _ => "",
         };
         warnings.push(format!(
-            "O mês típico usa a média de {months} ({} por mês); no fluxo mês a mês, cada mês usa \
-             a receita {window}, como o PGDAS-D.",
+            "O mês típico usa a média de {months} ({} por mês){flow}.",
             brl(revenue.average)
         ));
         if revenue.annualized {
@@ -314,7 +319,8 @@ impl<'a> Estimate<'a> {
         if let Some(opening) = input.opening {
             let since = opening.months_until(input.reference);
             if opening.year == input.reference.year || (0..13).contains(&since) {
-                let months = match &tables.simples.opening {
+                // The rule of the year the company opened in.
+                let months = match &self.data.tables(opening).simples.opening {
                     Some(rule) => format!(
                         "nos {} primeiros meses de atividade o PGDAS-D usa a 1ª faixa e Fator R de \
                          {}, e até o 13º mês a média dos meses anteriores ao mês anterior × 12",

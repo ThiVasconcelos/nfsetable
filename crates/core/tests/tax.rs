@@ -833,6 +833,15 @@ fn opening_of_activity_in_2027() {
         &report,
         "nos 2 primeiros meses de atividade o PGDAS-D usa a 1ª faixa e Fator R de 28%"
     ));
+
+    // A company opened in 2026 is told the rule of 2026, even with a 2027 reference month.
+    let mut tax = input("2027-03", months("2026-06", 10, 1_000_000));
+    tax.opening_month = Some("2026-06".to_string());
+    let report = tax_report(&tax).unwrap();
+    assert!(has_warning(
+        &report,
+        "nos primeiros meses o PGDAS-D usa a receita do 1º mês × 12"
+    ));
 }
 
 #[test]
@@ -1379,6 +1388,12 @@ fn the_mei_has_no_pro_labore_in_the_cash_flow() {
     tax.regime = TaxRegime::Mei;
     tax.monthly_costs_cents = 20_000;
     let report = tax_report(&tax).unwrap();
+    // The MEI has no RBT12 month by month: the typical-month warning says nothing about it.
+    assert!(has_warning(
+        &report,
+        "O mês típico usa a média de 3 meses (R$ 5.000,00 por mês)."
+    ));
+    assert!(!has_warning(&report, "no fluxo mês a mês"));
     // DAS-MEI 86,05; lucro 5.000 − 86,05 − 200 = 4.713,95; no pró-labore nor Simples details.
     for month in &report.cash_flow {
         assert_eq!(month.company_taxes_cents, 8_605);
