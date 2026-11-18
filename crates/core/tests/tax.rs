@@ -693,7 +693,8 @@ fn simples_tables_of_2027_have_cbs_and_ibs() {
 
     // The 6th bracket goes from 33% to 32,90% in Anexo III: RBT12 4.200.000 →
     // (4.200.000 × 32,9% − 648.000) / 4.200.000 = 733.800 / 4.200.000; DAS on 350.000 =
-    // 733.800 / 12 = 61.150,00 (61.500,00 in 2026), without ISS and IBS, which are paid outside.
+    // 733.800 / 12 = 61.150,00 (61.500,00 in 2026), without ISS and IBS. The ISS is added outside
+    // the DAS at the municipal rate; the IBS outside is not estimated, and the warning says so.
     let report = tax_report(&input("2027-03", months("2026-04", 12, 35_000_000))).unwrap();
     let simples = &report.simples;
     assert_eq!(simples.bracket, 6);
@@ -702,6 +703,14 @@ fn simples_tables_of_2027_have_cbs_and_ibs() {
     assert_eq!(shares_sum(&simples.split), 6_115_000);
     let taxes: Vec<&str> = simples.split.iter().map(|s| s.tax.as_str()).collect();
     assert_eq!(taxes, ["irpj", "csll", "cbs", "cpp"]);
+    assert!(has_warning(
+        &report,
+        "O IBS também sai do DAS e não entra nesta estimativa."
+    ));
+    // 2026 has no IBS: the sentence does not appear.
+    let report = tax_report(&input("2026-09", months("2025-10", 12, 35_000_000))).unwrap();
+    assert!(has_warning(&report, "6ª faixa"));
+    assert!(!has_warning(&report, "O IBS também"));
 }
 
 #[test]

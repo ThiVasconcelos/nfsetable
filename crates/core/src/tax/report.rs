@@ -439,9 +439,14 @@ impl<'a> Estimate<'a> {
                 brl(simples.epp_limit)
             ));
         } else if das.iss_outside {
+            let ibs = if das.ibs_outside {
+                " O IBS também sai do DAS e não entra nesta estimativa."
+            } else {
+                ""
+            };
             warnings.push(format!(
                 "RBT12 de {} na 6ª faixa do Simples Nacional: o ISS sai do DAS e é pago à parte ao \
-                 município (considerado a {}).",
+                 município (considerado a {}).{ibs}",
                 brl(self.revenue.rbt12),
                 percent(input.iss_rate)
             ));

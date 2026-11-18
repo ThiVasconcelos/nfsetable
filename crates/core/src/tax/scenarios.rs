@@ -335,6 +335,9 @@ fn band_note(ctx: &Ctx, das: &Das) -> Option<String> {
             percent(ctx.input.iss_rate)
         ));
     }
+    if das.ibs_outside {
+        note.push_str(" O IBS também sai do DAS e não entra nesta estimativa.");
+    }
     Some(note)
 }
 

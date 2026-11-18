@@ -82,6 +82,9 @@ pub(crate) struct Das {
     pub split: Vec<(String, Decimal)>,
     /// The bracket has no ISS inside the DAS (6th): the ISS is paid directly to the municipality.
     pub iss_outside: bool,
+    /// The bracket has no IBS inside the DAS either (6th, from 2027); the IBS paid outside is not
+    /// estimated.
+    pub ibs_outside: bool,
     /// The RBT12 is above the last bracket (the ceiling of the Simples Nacional).
     pub above_ceiling: bool,
 }
@@ -133,6 +136,10 @@ pub(crate) fn das(simples: &Simples, annex: Annex, rbt12: Decimal, revenue: Deci
         total,
         split,
         iss_outside,
+        ibs_outside: bracket
+            .split
+            .iter()
+            .any(|(tax, share)| tax == "ibs" && share.is_none()),
         above_ceiling: found.is_none(),
     }
 }
