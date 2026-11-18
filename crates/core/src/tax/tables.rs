@@ -17,9 +17,10 @@ use std::sync::OnceLock;
 const BR_JSON: &str = include_str!("../../tax/br.json");
 const SCHEMA_VERSION: u32 = 1;
 
-/// Canonical order of the taxes of a split (the order of the tables of LC 123/2006). Unknown
-/// taxes (e.g. CBS and IBS from 2027) go after these, alphabetically.
-const TAX_ORDER: [&str; 6] = ["irpj", "csll", "cofins", "pis", "cpp", "iss"];
+/// Canonical order of the taxes of a split: the columns of the tables of LC 123/2006, IRPJ, CSLL,
+/// Cofins, PIS, CPP and ISS until 2026, and IRPJ, CSLL, CBS, CPP, ISS and IBS from 2027 (LC
+/// 214/2025, Anexos XX and XXII). Unknown taxes go after these, alphabetically.
+const TAX_ORDER: [&str; 8] = ["irpj", "csll", "cofins", "pis", "cbs", "cpp", "iss", "ibs"];
 
 static DATA: OnceLock<Result<TaxData, String>> = OnceLock::new();
 
@@ -736,6 +737,30 @@ mod tests {
         let taxes: Vec<&str> = bracket.split.iter().map(|(t, _)| t.as_str()).collect();
         assert_eq!(taxes, ["irpj", "csll", "cofins", "pis", "cpp", "iss"]);
         assert_eq!(bracket.split[2].1, Some(dec!(0.1282)));
+    }
+
+    #[test]
+    fn splits_follow_the_columns_of_the_law() {
+        #[derive(Deserialize)]
+        struct Split {
+            #[serde(deserialize_with = "shares")]
+            split: Vec<(String, Option<Decimal>)>,
+        }
+        let taxes = |json: &str| -> Vec<String> {
+            let parsed: Split = serde_json::from_str(json).unwrap();
+            parsed.split.into_iter().map(|(tax, _)| tax).collect()
+        };
+        assert_eq!(
+            taxes(
+                r#"{"split": {"ibs": 0.0017, "iss": 0.335, "cpp": 0.434, "cbs": 0.1543, "csll": 0.035, "irpj": 0.04}}"#
+            ),
+            ["irpj", "csll", "cbs", "cpp", "iss", "ibs"]
+        );
+        // Unknown taxes go last, alphabetically.
+        assert_eq!(
+            taxes(r#"{"split": {"zeta": 0.1, "alfa": 0.1, "iss": 0.8}}"#),
+            ["iss", "alfa", "zeta"]
+        );
     }
 
     #[test]
