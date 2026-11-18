@@ -636,6 +636,7 @@ export function mockTaxReport(input: TaxInput): TaxReport {
       projectionRatio: projection / limit,
       projectedStatus,
       dasCents: meiSc.companyTotal,
+      dasSplit: meiSc.companyTaxes,
       itServicesAllowed: false,
     },
     simples: {

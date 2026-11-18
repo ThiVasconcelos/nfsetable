@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { formatBRL, formatPercent } from '../lib/format'
-  import { MEI_PROJECTED_HINT, MEI_PROJECTED_LABEL, MEI_STATUS_HINT, MEI_STATUS_LABEL } from '../lib/labels'
+  import { formatAmount, formatBRL, formatPercent } from '../lib/format'
+  import { MEI_PROJECTED_HINT, MEI_PROJECTED_LABEL, MEI_STATUS_HINT, MEI_STATUS_LABEL, taxHint, taxName } from '../lib/labels'
   import type { CnaeInfo, MeiReport, MeiStatus } from '../lib/types'
   import Icon from './Icon.svelte'
   import Meter from './Meter.svelte'
@@ -105,6 +105,15 @@
     <div>
       <dt>DAS-MEI</dt>
       <dd class="num">{formatBRL(mei.dasCents)} <span class="sub">por mês</span></dd>
+      {#if mei.dasSplit.length > 1}
+        <dd class="parts">
+          {#each mei.dasSplit as share, i (share.tax)}
+            {#if i > 0}<span aria-hidden="true"> · </span>{/if}<span title={taxHint(share.tax)}
+              >{taxName(share.tax)} <span class="num">{formatAmount(share.cents)}</span></span
+            >
+          {/each}
+        </dd>
+      {/if}
     </div>
   </dl>
 </TaxCard>
@@ -207,6 +216,12 @@
   .sub {
     font-size: 12px;
     font-weight: 400;
+    color: var(--text-3);
+  }
+
+  .parts {
+    margin-top: 2px;
+    font-size: 11.5px;
     color: var(--text-3);
   }
 </style>

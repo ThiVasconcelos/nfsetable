@@ -455,6 +455,8 @@ export interface MeiReport {
   projectedStatus: MeiStatus
   /** Monthly DAS-MEI for services. */
   dasCents: number
+  /** The DAS-MEI by tax: INSS, ISS and, from 2027, CBS and IBS (no ISS from 2033). */
+  dasSplit: TaxShare[]
   /** Software development and IT services are not allowed to the MEI. */
   itServicesAllowed: boolean
 }

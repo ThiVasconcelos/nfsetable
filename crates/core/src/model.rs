@@ -557,6 +557,8 @@ pub struct MeiReport {
     pub projected_status: MeiStatus,
     /// Monthly DAS-MEI for services.
     pub das_cents: i64,
+    /// The DAS-MEI by tax: INSS, ISS and, from 2027, CBS and IBS (no ISS from 2033).
+    pub das_split: Vec<TaxShare>,
     /// Software development and IT services are not allowed to the MEI.
     pub it_services_allowed: bool,
 }

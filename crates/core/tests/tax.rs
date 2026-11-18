@@ -859,6 +859,16 @@ fn das_mei_with_cbs_and_ibs_in_2027() {
     // 5% × 1.621,00 (the latest minimum wage in the tables) = 81,05 + ISS 5,00 + CBS 0,994 → 0,99
     // + IBS 0,006 → 0,01 = 87,05.
     assert_eq!(report.mei.das_cents, 8_705);
+    let split: Vec<(&str, i64)> = report
+        .mei
+        .das_split
+        .iter()
+        .map(|s| (s.tax.as_str(), s.cents))
+        .collect();
+    assert_eq!(
+        split,
+        [("inss", 8_105), ("iss", 500), ("cbs", 99), ("ibs", 1)]
+    );
     let m = regime(&report, "mei");
     let company: Vec<(&str, i64)> = m
         .company_taxes
@@ -1102,6 +1112,10 @@ fn report_json_shape() {
     assert_eq!(value["mei"]["status"], "within");
     assert_eq!(value["mei"]["projectedStatus"], "within");
     assert_eq!(value["mei"]["itServicesAllowed"], false);
+    assert_eq!(
+        value["mei"]["dasSplit"][1],
+        json!({"tax": "iss", "cents": 500})
+    );
     assert_eq!(value["simples"]["fatorR"], 0.32);
     assert_eq!(value["simples"]["proLaboreForAnnexIiiCents"], 162_100);
     assert_eq!(value["simples"]["meLimitRemainingCents"], 34_500_000);

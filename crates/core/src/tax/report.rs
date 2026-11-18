@@ -81,7 +81,8 @@ struct Estimate<'a> {
     /// MEI: the year to date against the limit, and where the year is heading.
     status: MeiStatus,
     outlook: MeiOutlook,
-    mei_das: Decimal,
+    /// DAS-MEI by tax.
+    mei_das: Vec<(String, Decimal)>,
 }
 
 impl<'a> Estimate<'a> {
@@ -174,7 +175,7 @@ impl<'a> Estimate<'a> {
                 projection,
                 projected: mei::status(projection, limit, tolerance),
             },
-            mei_das: mei::das(tables).iter().map(|(_, amount)| *amount).sum(),
+            mei_das: mei::das(tables),
         }
     }
 
@@ -237,7 +238,8 @@ impl<'a> Estimate<'a> {
                 year_projection_cents: to_cents(outlook.projection),
                 projection_ratio: to_f64(ratio(outlook.projection, outlook.limit)),
                 projected_status: outlook.projected,
-                das_cents: to_cents(self.mei_das),
+                das_cents: to_cents(self.mei_das.iter().map(|(_, amount)| *amount).sum()),
+                das_split: scenarios::tax_shares(&self.mei_das),
                 it_services_allowed: tables.mei.it_services_allowed,
             },
             simples: SimplesReport {
@@ -506,6 +508,7 @@ pub(crate) fn zero_report(input: &Input, warnings: Vec<String>) -> TaxReport {
             projection_ratio: 0.0,
             projected_status: MeiStatus::Within,
             das_cents: 0,
+            das_split: Vec::new(),
             it_services_allowed: false,
         },
         simples: SimplesReport {
