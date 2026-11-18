@@ -112,13 +112,24 @@ const TABLES_2027: Tables = {
   from: '2027-01',
   meiAnnualLimit: 11_000_000,
   meiOpeningMonthlyLimit: 916_667,
+  // LC 214/2025, Anexo XXIII: CBS 0,994 and IBS 0,006, each rounded to the cent.
+  meiDasFixed: { iss: 500, cbs: 99, ibs: 1 },
   annex: ANNEX_2027,
   windowOffset: 2,
 }
 const TABLES_2028: Tables = { ...TABLES_2027, from: '2028-01', meiAnnualLimit: 14_000_000, meiOpeningMonthlyLimit: 1_166_667 }
 
+/** DAS-MEI from 2029: the ISS falls and the IBS takes its place (no ISS from 2033). */
+const TABLES_2029_ON: Tables[] = [
+  { ...TABLES_2028, from: '2029-01', meiDasFixed: { iss: 450, cbs: 100, ibs: 20 } },
+  { ...TABLES_2028, from: '2030-01', meiDasFixed: { iss: 400, cbs: 100, ibs: 40 } },
+  { ...TABLES_2028, from: '2031-01', meiDasFixed: { iss: 350, cbs: 100, ibs: 60 } },
+  { ...TABLES_2028, from: '2032-01', meiDasFixed: { iss: 300, cbs: 100, ibs: 80 } },
+  { ...TABLES_2028, from: '2033-01', meiDasFixed: { cbs: 100, ibs: 200 } },
+]
+
 /** Oldest first. */
-const TABLES: Tables[] = [TABLES_2026, TABLES_2027, TABLES_2028]
+const TABLES: Tables[] = [TABLES_2026, TABLES_2027, TABLES_2028, ...TABLES_2029_ON]
 
 /** The tables of `month` (yyyy-mm): the latest that started by then, the first ones before them. */
 function tablesFor(month: string): Tables {

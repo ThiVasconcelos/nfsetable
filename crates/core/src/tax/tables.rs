@@ -194,7 +194,8 @@ pub(crate) struct Mei {
     pub tax_free_distribution: Distribution,
 }
 
-/// Monthly DAS-MEI of a service provider: a share of the minimum wage (INSS) plus fixed ISS.
+/// Monthly DAS-MEI of a service provider: a share of the minimum wage (INSS) plus fixed ISS and,
+/// from 2027, fixed CBS and IBS.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct MeiDas {
@@ -207,6 +208,10 @@ pub(crate) struct MeiDas {
     pub inss_rate_on_minimum_wage: Decimal,
     #[serde(deserialize_with = "number")]
     pub iss: Decimal,
+    #[serde(default, deserialize_with = "number")]
+    pub cbs: Decimal,
+    #[serde(default, deserialize_with = "number")]
+    pub ibs: Decimal,
 }
 
 #[derive(Debug, Deserialize)]
@@ -821,7 +826,6 @@ mod tests {
             [
                 "Salário mínimo",
                 "INSS do pró-labore",
-                "DAS-MEI",
                 "Simples Nacional",
                 "Lucro Presumido"
             ]

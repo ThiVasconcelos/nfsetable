@@ -138,7 +138,6 @@ impl<'a> Estimate<'a> {
         let tolerance = tables.mei.tolerance_ratio;
         let projection =
             revenue.year_to_date + revenue.average * Decimal::from(12 - input.reference.month);
-        let (mei_inss, mei_iss) = mei::das(tables);
 
         // Costs of the typical month: the reference month's, never an average. The fixed costs in
         // effect in it (a dated item that ended counts nothing, one that started counts in full)
@@ -172,7 +171,7 @@ impl<'a> Estimate<'a> {
                 projection,
                 projected: mei::status(projection, limit, tolerance),
             },
-            mei_das: mei_inss + mei_iss,
+            mei_das: mei::das(tables).iter().map(|(_, amount)| *amount).sum(),
         }
     }
 

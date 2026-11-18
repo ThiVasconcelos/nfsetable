@@ -36,14 +36,19 @@ pub(crate) fn it_blocked(activity: SimplesActivity, tables: &Tables) -> bool {
     activity == SimplesActivity::FatorR && !tables.mei.it_services_allowed
 }
 
-/// Monthly DAS-MEI of a service provider as (INSS, ISS): the INSS is a share (5%) of the minimum
-/// wage of the reference month, the ISS a fixed amount.
-pub(crate) fn das(tables: &Tables) -> (Decimal, Decimal) {
+/// Monthly DAS-MEI of a service provider by tax: the INSS is a share (5%) of the minimum wage of
+/// the month, the ISS and, from 2027, the CBS and the IBS fixed amounts, each rounded to the cent
+/// (0,994 and 0,006 become 0,99 and 0,01). Taxes without an amount in the tables are left out.
+pub(crate) fn das(tables: &Tables) -> Vec<(String, Decimal)> {
     let das = tables.mei_das;
-    (
-        round_money(tables.minimum_wage * das.inss_rate_on_minimum_wage),
-        round_money(das.iss),
-    )
+    let inss = round_money(tables.minimum_wage * das.inss_rate_on_minimum_wage);
+    let fixed = [("iss", das.iss), ("cbs", das.cbs), ("ibs", das.ibs)]
+        .into_iter()
+        .filter(|(_, amount)| !amount.is_zero())
+        .map(|(tax, amount)| (tax.to_string(), round_money(amount)));
+    std::iter::once(("inss".to_string(), inss))
+        .chain(fixed)
+        .collect()
 }
 
 #[cfg(test)]
@@ -55,18 +60,58 @@ mod tests {
     use crate::tax::month::month;
     use crate::tax::tables::tables_for;
 
+    fn das_of(text: &str) -> Vec<(String, Decimal)> {
+        das(&data().unwrap().tables(month(text)))
+    }
+
+    fn parts(parts: &[(&str, Decimal)]) -> Vec<(String, Decimal)> {
+        parts.iter().map(|(t, a)| (t.to_string(), *a)).collect()
+    }
+
     #[test]
     fn das_follows_the_minimum_wage_of_the_year() {
-        let data = data().unwrap();
         // 2026: 5% × 1.621,00 = 81,05 + ISS 5,00.
         assert_eq!(
-            das(&data.tables(month("2026-01"))),
-            (dec!(81.05), dec!(5.00))
+            das_of("2026-01"),
+            parts(&[("inss", dec!(81.05)), ("iss", dec!(5.00))])
         );
         // 2025: 5% × 1.518,00 = 75,90 + ISS 5,00.
         assert_eq!(
-            das(&data.tables(month("2025-12"))),
-            (dec!(75.90), dec!(5.00))
+            das_of("2025-12"),
+            parts(&[("inss", dec!(75.90)), ("iss", dec!(5.00))])
+        );
+    }
+
+    #[test]
+    fn das_has_cbs_and_ibs_from_2027() {
+        // 2027–2028: ISS 5,00, CBS 0,994 → 0,99 and IBS 0,006 → 0,01 (R$ 1,00 together); the INSS
+        // still uses the 2026 minimum wage, the latest in the tables.
+        let expected = parts(&[
+            ("inss", dec!(81.05)),
+            ("iss", dec!(5.00)),
+            ("cbs", dec!(0.99)),
+            ("ibs", dec!(0.01)),
+        ]);
+        assert_eq!(das_of("2027-01"), expected);
+        assert_eq!(das_of("2028-12"), expected);
+        // 2030: ISS 4,00, CBS 1,00, IBS 0,40.
+        assert_eq!(
+            das_of("2030-06"),
+            parts(&[
+                ("inss", dec!(81.05)),
+                ("iss", dec!(4.00)),
+                ("cbs", dec!(1.00)),
+                ("ibs", dec!(0.40))
+            ])
+        );
+        // From 2033 the ISS is gone: CBS 1,00 and IBS 2,00.
+        assert_eq!(
+            das_of("2033-01"),
+            parts(&[
+                ("inss", dec!(81.05)),
+                ("cbs", dec!(1.00)),
+                ("ibs", dec!(2.00))
+            ])
         );
     }
 

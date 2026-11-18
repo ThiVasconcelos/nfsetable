@@ -85,9 +85,8 @@ pub(crate) fn tax_shares(shares: &[(String, Decimal)]) -> Vec<TaxShare> {
 }
 
 fn mei_cost(tables: &Tables) -> Cost {
-    let (inss, iss) = mei::das(tables);
     Cost {
-        company: vec![("inss".to_string(), inss), ("iss".to_string(), iss)],
+        company: mei::das(tables),
         owner: ProLaboreTaxes::default(),
     }
 }

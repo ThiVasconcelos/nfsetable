@@ -713,6 +713,30 @@ fn the_rbt12_window_skips_the_previous_month_from_2027() {
 }
 
 #[test]
+fn das_mei_with_cbs_and_ibs_in_2027() {
+    let mut tax = input("2027-03", months("2027-01", 3, 500_000));
+    tax.regime = TaxRegime::Mei;
+    let report = tax_report(&tax).unwrap();
+    // 5% × 1.621,00 (the latest minimum wage in the tables) = 81,05 + ISS 5,00 + CBS 0,994 → 0,99
+    // + IBS 0,006 → 0,01 = 87,05.
+    assert_eq!(report.mei.das_cents, 8_705);
+    let m = regime(&report, "mei");
+    let company: Vec<(&str, i64)> = m
+        .company_taxes
+        .iter()
+        .map(|s| (s.tax.as_str(), s.cents))
+        .collect();
+    assert_eq!(
+        company,
+        [("inss", 8_105), ("iss", 500), ("cbs", 99), ("ibs", 1)]
+    );
+    assert!(report
+        .cash_flow
+        .iter()
+        .all(|month| month.company_taxes_cents == 8_705));
+}
+
+#[test]
 fn tables_follow_the_reference_month() {
     // Pró-labore 5.600 (automatic for 20.000/month), INSS 616,00, base 4.984,00.
     let irrf = |reference: &str| {
@@ -792,8 +816,8 @@ fn malformed_and_duplicate_months() {
 #[test]
 fn reference_month_outside_the_tables() {
     let report = tax_report(&input("2027-03", months("2027-01", 3, 500_000))).unwrap();
-    // Uses the 2026 tables: DAS-MEI 86,05 and one minimum wage of 1.621,00.
-    assert_eq!(report.mei.das_cents, 8_605);
+    // Uses the 2026 minimum wage, 1.621,00: DAS-MEI 81,05 + 5,00 + CBS/IBS 1,00 = 87,05.
+    assert_eq!(report.mei.das_cents, 8_705);
     assert_eq!(report.pro_labore.gross_cents, 162_100);
     assert!(has_warning(
         &report,
