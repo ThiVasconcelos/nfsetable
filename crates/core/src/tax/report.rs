@@ -368,6 +368,9 @@ impl<'a> Estimate<'a> {
     /// Current regime MEI: IT services and the annual limit.
     fn mei_warnings(&self, warnings: &mut Vec<String>) {
         let (input, tables, outlook) = (self.ctx.input, self.ctx.tables, &self.outlook);
+        if let Some(note) = &tables.mei.note {
+            warnings.push(note.clone());
+        }
         if mei::it_blocked(input.activity, tables) {
             warnings.push(
                 "Desenvolvimento de software e serviços de TI não podem ser MEI (LC 123/2006, \

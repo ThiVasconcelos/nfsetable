@@ -109,6 +109,7 @@
       "valid_to": "2027-12-31",
       "annual_limit": 110000.00,
       "opening_year_monthly_limit": 9166.67,
+      "note": "O limite de R$ 110.000,00 em 2027 depende de a lei orçamentária considerar a renúncia de receita (LC 238/2026, art. 3º); sem isso, continua R$ 81.000,00.",
       "tolerance_ratio": 0.20,
       "it_services_allowed": false,
       "tax_free_distribution": {
@@ -123,6 +124,7 @@
       "valid_to": null,
       "annual_limit": 140000.00,
       "opening_year_monthly_limit": 11666.67,
+      "note": "O limite de R$ 140.000,00 a partir de 2028 depende de a lei orçamentária considerar a renúncia de receita (LC 238/2026, art. 3º); sem isso, continua R$ 81.000,00.",
       "tolerance_ratio": 0.20,
       "it_services_allowed": false,
       "tax_free_distribution": {

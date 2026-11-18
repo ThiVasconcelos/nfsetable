@@ -208,6 +208,9 @@ pub(crate) struct Mei {
     pub tolerance_ratio: Decimal,
     pub it_services_allowed: bool,
     pub tax_free_distribution: Distribution,
+    /// pt-BR caveat on these values (e.g. a condition of the law), shown as a warning in the MEI.
+    #[serde(default)]
+    pub note: Option<String>,
 }
 
 /// Monthly DAS-MEI of a service provider: a share of the minimum wage (INSS) plus fixed ISS and,

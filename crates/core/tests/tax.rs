@@ -458,6 +458,8 @@ fn mei_limit_of_2027() {
         tax.activity = SimplesActivity::AnnexIii;
         let report = tax_report(&tax).unwrap();
         assert_eq!(report.mei.limit_cents, 11_000_000);
+        // The new limit depends on the budget law (LC 238/2026, art. 3º): the MEI is told.
+        assert!(has_warning(&report, "depende de a lei orçamentária"));
         (report.mei.year_to_date_cents, report.mei.status)
     };
     // 11 × 10.000,00 = 110.000,00 up to November: still within.
@@ -483,6 +485,26 @@ fn mei_limit_of_2027() {
         status(revenue, "2027-12"),
         (13_200_001, MeiStatus::AboveTolerance)
     );
+
+    // From 2028: R$ 140.000,00, and 11.666,67 per month in the opening year. Opened in May 2028:
+    // 8 months (May to December) × 11.666,67 = 93.333,36; 8 × 11.000,00 = 88.000,00 within it.
+    let mut tax = input("2028-12", months("2028-05", 8, 1_100_000));
+    tax.regime = TaxRegime::Mei;
+    tax.activity = SimplesActivity::AnnexIii;
+    let report = tax_report(&tax).unwrap();
+    assert_eq!(report.mei.limit_cents, 14_000_000);
+    tax.opening_month = Some("2028-05".to_string());
+    let report = tax_report(&tax).unwrap();
+    assert_eq!(report.mei.limit_cents, 9_333_336);
+    assert_eq!(
+        (report.mei.year_to_date_cents, report.mei.status),
+        (8_800_000, MeiStatus::Within)
+    );
+    assert!(has_warning(&report, "R$ 140.000,00 a partir de 2028"));
+    // No such caveat in 2026.
+    let mut tax = input("2026-03", months("2026-01", 3, 500_000));
+    tax.regime = TaxRegime::Mei;
+    assert!(!has_warning(&tax_report(&tax).unwrap(), "lei orçamentária"));
 }
 
 #[test]

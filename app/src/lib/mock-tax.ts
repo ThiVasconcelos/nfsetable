@@ -98,6 +98,8 @@ interface Tables {
   openingMonths: number
   /** pt-BR warnings on what these tables still lack. */
   pending: string[]
+  /** pt-BR caveat on the MEI limit, warned in the MEI. */
+  meiNote?: string
 }
 
 const TABLES_2026: Tables = {
@@ -118,6 +120,7 @@ const TABLES_2027: Tables = {
   from: '2027-01',
   meiAnnualLimit: 11_000_000,
   meiOpeningMonthlyLimit: 916_667,
+  meiNote: 'O limite de R$ 110.000,00 em 2027 depende de a lei orçamentária considerar a renúncia de receita (LC 238/2026, art. 3º); sem isso, continua R$ 81.000,00.',
   // LC 214/2025, Anexo XXIII: CBS 0,994 and IBS 0,006, each rounded to the cent.
   meiDasFixed: { iss: 500, cbs: 99, ibs: 1 },
   annex: ANNEX_2027,
@@ -133,6 +136,7 @@ const TABLES_2028: Tables = {
   from: '2028-01',
   meiAnnualLimit: 14_000_000,
   meiOpeningMonthlyLimit: 1_166_667,
+  meiNote: 'O limite de R$ 140.000,00 a partir de 2028 depende de a lei orçamentária considerar a renúncia de receita (LC 238/2026, art. 3º); sem isso, continua R$ 81.000,00.',
   pending: [
     'As regras de 2028 em diante estão incompletas: faltam salário mínimo, INSS, o Lucro Presumido com CBS e IBS e, a partir de 2029, as tabelas do Simples Nacional da troca do ISS pelo IBS.',
   ],
@@ -591,6 +595,7 @@ export function mockTaxReport(input: TaxInput): TaxReport {
   }
 
   const warnings: string[] = []
+  if (input.regime === 'mei' && refTables.meiNote) warnings.push(refTables.meiNote)
   if (annualized)
     warnings.push(
       `Com ${count === 1 ? '1 mês' : `${count} meses`}, o RBT12 foi estimado pela média × 12 (regra das empresas novas).`,
