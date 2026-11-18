@@ -425,7 +425,7 @@ export function mockTaxReport(input: TaxInput): TaxReport {
   // MEI.
   const limit =
     opening && opening.slice(0, 4) === refYear
-      ? refTables.meiOpeningMonthlyLimit * (13 - Number(opening.slice(5, 7)))
+      ? Math.min(refTables.meiOpeningMonthlyLimit * (13 - Number(opening.slice(5, 7))), refTables.meiAnnualLimit)
       : refTables.meiAnnualLimit
   const projection = yearToDate + average * (12 - refMonth)
   const status = meiStatus(yearToDate / limit)

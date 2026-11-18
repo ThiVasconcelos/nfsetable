@@ -8,13 +8,14 @@ use crate::model::{MeiStatus, SimplesActivity};
 use rust_decimal::Decimal;
 
 /// Limit of the reference year: the annual limit, or in the opening year the monthly limit times
-/// the months from the opening month to December (a started month counts in full).
+/// the months from the opening month to December (a started month counts in full), never above the
+/// annual limit: the monthly limits of LC 238/2026 are rounded (12 × 9.166,67 = 110.000,04).
 pub(crate) fn limit(tables: &Tables, reference: Month, opening: Option<Month>) -> Decimal {
     let mei = tables.mei;
     match opening {
-        Some(opening) if opening.year == reference.year => {
-            mei.opening_year_monthly_limit * Decimal::from(13 - opening.month)
-        }
+        Some(opening) if opening.year == reference.year => (mei.opening_year_monthly_limit
+            * Decimal::from(13 - opening.month))
+        .min(mei.annual_limit),
         _ => mei.annual_limit,
     }
 }
@@ -152,6 +153,15 @@ mod tests {
         assert_eq!(
             limit(&tables, reference, Some(month("2027-05"))),
             dec!(140000)
+        );
+        // Opened in January 2027: 12 × 9.166,67 = 110.000,04, capped at the annual 110.000,00.
+        assert_eq!(
+            limit(
+                &tables_for("2027-06"),
+                month("2027-06"),
+                Some(month("2027-01"))
+            ),
+            dec!(110000)
         );
         // Opened in March 2028: 10 months × 11.666,67 = 116.666,70.
         assert_eq!(
