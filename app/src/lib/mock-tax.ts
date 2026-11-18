@@ -1,7 +1,7 @@
 // Simplified tax estimates for the browser mock (npm run dev, screenshots). This is NOT the real
-// engine (crates/core/src/tax): it only produces plausible numbers with the 2026 tables in round
-// figures, so the tax page can be exercised without Tauri. The CNAE catalog below is synthetic too
-// (real codes, simplified rules).
+// engine (crates/core/src/tax): it only produces plausible numbers with the tables of each year in
+// round figures, so the tax page can be exercised without Tauri. The CNAE catalog below is
+// synthetic too (real codes, simplified rules).
 
 import { addMonths, formatBRLPlain, formatPercent } from './format'
 import type {
@@ -16,10 +16,8 @@ import type {
   TaxShare,
 } from './types'
 
-// ---------------------------------------------------------------- 2026 tables (cents)
+// ---------------------------------------------------------------- tables (cents)
 
-const MIN_WAGE = 162_100
-const INSS_CEILING = 847_555
 const INSS_RATE = 0.11
 /** Monthly IRRF table: [base up to, rate, deduction]. */
 const IRRF_TABLE: [number, number, number][] = [
@@ -31,9 +29,8 @@ const IRRF_TABLE: [number, number, number][] = [
 ]
 const IRRF_DEPENDENT = 18_959
 const IRRF_SIMPLIFIED = 60_720
-const MEI_ANNUAL_LIMIT = 8_100_000
-const MEI_OPENING_MONTHLY_LIMIT = 675_000
-const MEI_DAS_SERVICES = 8_605
+/** Share of the minimum wage in the DAS-MEI (the owner's INSS). */
+const MEI_INSS_RATE = 0.05
 const ME_LIMIT = 36_000_000
 const EPP_LIMIT = 480_000_000
 const PRESUMPTION = 0.32
@@ -45,7 +42,7 @@ interface Bracket {
   split: Record<string, number>
 }
 
-const ANNEX: Record<'III' | 'V', Bracket[]> = {
+const ANNEX_2026: Record<'III' | 'V', Bracket[]> = {
   III: [
     { upTo: 18_000_000, nominal: 0.06, deduction: 0, split: { irpj: 0.04, csll: 0.035, cofins: 0.1282, pis: 0.0278, cpp: 0.434, iss: 0.335 } },
     { upTo: 36_000_000, nominal: 0.112, deduction: 936_000, split: { irpj: 0.04, csll: 0.035, cofins: 0.1405, pis: 0.0305, cpp: 0.434, iss: 0.32 } },
@@ -64,12 +61,51 @@ const ANNEX: Record<'III' | 'V', Bracket[]> = {
   ],
 }
 
+/** The tables in force from one month on, like the versioned blocks of the engine's br.json. */
+interface Tables {
+  /** First month (yyyy-mm). */
+  from: string
+  minWage: number
+  inssCeiling: number
+  meiAnnualLimit: number
+  meiOpeningMonthlyLimit: number
+  /** Fixed amounts of the DAS-MEI of a service provider, on top of the INSS. */
+  meiDasFixed: Record<string, number>
+  annex: Record<'III' | 'V', Bracket[]>
+}
+
+/** Oldest first. */
+const TABLES: Tables[] = [
+  {
+    from: '2026-01',
+    minWage: 162_100,
+    inssCeiling: 847_555,
+    meiAnnualLimit: 8_100_000,
+    meiOpeningMonthlyLimit: 675_000,
+    meiDasFixed: { iss: 500 },
+    annex: ANNEX_2026,
+  },
+]
+
+/** The tables of `month` (yyyy-mm): the latest that started by then, the first ones before them. */
+function tablesFor(month: string): Tables {
+  let found = TABLES[0]
+  for (const t of TABLES) if (t.from <= month) found = t
+  return found
+}
+
+/** DAS-MEI of a service provider by tax: 5% of the minimum wage (INSS) plus the fixed amounts. */
+function meiDas(t: Tables): TaxShare[] {
+  const fixed = Object.entries(t.meiDasFixed).map(([tax, cents]) => ({ tax, cents }))
+  return [{ tax: 'inss', cents: Math.round(t.minWage * MEI_INSS_RATE) }, ...fixed]
+}
+
 const sum = (values: number[]) => values.reduce((a, b) => a + b, 0)
 
 // ---------------------------------------------------------------- building blocks
 
-function ownerTaxes(gross: number, dependents: number) {
-  const inss = Math.round(Math.min(gross, INSS_CEILING) * INSS_RATE)
+function ownerTaxes(gross: number, dependents: number, t: Tables) {
+  const inss = Math.round(Math.min(gross, t.inssCeiling) * INSS_RATE)
   const deductions = Math.max(inss + dependents * IRRF_DEPENDENT, IRRF_SIMPLIFIED)
   const base = Math.max(0, gross - deductions)
   const [, rate, deduction] = IRRF_TABLE.find(([upTo]) => base <= upTo)!
@@ -90,8 +126,8 @@ function splitBy(total: number, shares: Record<string, number>): TaxShare[] {
   return out
 }
 
-function simples(annex: 'III' | 'V', rbt12: number, revenue: number) {
-  const table = ANNEX[annex]
+function simples(annex: 'III' | 'V', rbt12: number, revenue: number, t: Tables) {
+  const table = t.annex[annex]
   let index = table.findIndex((b) => rbt12 <= b.upTo)
   if (index < 0) index = table.length - 1
   const b = table[index]
@@ -155,6 +191,8 @@ interface Scenario {
 }
 
 interface Context {
+  /** Tables of the month computed. */
+  tables: Tables
   activity: SimplesActivity
   payroll: number
   dependents: number
@@ -163,16 +201,17 @@ interface Context {
   fixedProLabore: number | null
 }
 
-function autoProLabore(average: number, payroll: number): number {
+function autoProLabore(average: number, payroll: number, t: Tables): number {
   // Integer math (no float noise), rounded up so the Fator R is not truncated below 28%.
-  return Math.max(MIN_WAGE, Math.ceil((average * 28) / 100) - payroll)
+  return Math.max(t.minWage, Math.ceil((average * 28) / 100) - payroll)
 }
 
 function scenario(regime: TaxRegime, average: number, rbt12: number, ctx: Context): Scenario {
   if (regime === 'mei') {
+    const das = meiDas(ctx.tables)
     return {
-      companyTaxes: [{ tax: 'das', cents: MEI_DAS_SERVICES }],
-      companyTotal: MEI_DAS_SERVICES,
+      companyTaxes: das,
+      companyTotal: sum(das.map((s) => s.cents)),
       proLabore: 0,
       inss: 0,
       irrf: 0,
@@ -181,13 +220,13 @@ function scenario(regime: TaxRegime, average: number, rbt12: number, ctx: Contex
     }
   }
   if (regime === 'presumido') {
-    const proLabore = ctx.fixedProLabore ?? MIN_WAGE
+    const proLabore = ctx.fixedProLabore ?? ctx.tables.minWage
     const p = presumido(average, proLabore, ctx.issRate)
-    const o = ownerTaxes(proLabore, ctx.dependents)
+    const o = ownerTaxes(proLabore, ctx.dependents, ctx.tables)
     const federal = share(p.shares, 'irpj') + share(p.shares, 'csll') + share(p.shares, 'pis') + share(p.shares, 'cofins')
     return { companyTaxes: p.shares, companyTotal: p.total, proLabore, inss: o.inss, irrf: o.irrf, taxFreeLimit: Math.max(0, p.base - federal), annex: null }
   }
-  return simplesScenario(average, rbt12, ctx, ctx.fixedProLabore ?? autoProLabore(average, ctx.payroll))
+  return simplesScenario(average, rbt12, ctx, ctx.fixedProLabore ?? autoProLabore(average, ctx.payroll, ctx.tables))
 }
 
 /** Simples Nacional with a given pró-labore; the annex follows the Fator R unless forced. */
@@ -199,8 +238,8 @@ function simplesScenario(
   forceAnnex?: 'III' | 'V',
 ): Scenario {
   const annex = forceAnnex ?? annexFor(ctx.activity, fatorROf((proLabore + ctx.payroll) * 12, rbt12))
-  const s = simples(annex, rbt12, average)
-  const o = ownerTaxes(proLabore, ctx.dependents)
+  const s = simples(annex, rbt12, average, ctx.tables)
+  const o = ownerTaxes(proLabore, ctx.dependents, ctx.tables)
   return {
     companyTaxes: s.split,
     companyTotal: s.das,
@@ -223,6 +262,7 @@ export function mockTaxReport(input: TaxInput): TaxReport {
   const months = [...input.revenueByMonth].sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0))
   if (!months.length) throw 'Escolha pelo menos um mês com faturamento.'
   const ref = input.referenceMonth
+  const refTables = tablesFor(ref)
   const refYear = ref.slice(0, 4)
   const refMonth = Number(ref.slice(5, 7))
   const count = months.length
@@ -252,6 +292,7 @@ export function mockTaxReport(input: TaxInput): TaxReport {
   const costs = fixed + variableTypical
 
   const ctx: Context = {
+    tables: refTables,
     activity: input.activity,
     payroll: input.payrollCents,
     dependents: input.dependents,
@@ -280,35 +321,35 @@ export function mockTaxReport(input: TaxInput): TaxReport {
 
   // Pró-labore of the user's choice. Automatic: the least that keeps the typical month and every
   // month considered in Anexo III (28% of its RBT12 / 12, minus the other payroll), at least the
-  // minimum wage. The binding month (ties: the latest) explains it when it decides.
+  // minimum wage of each of them. The binding month (ties: the latest) explains it when it decides.
   const automatic = input.proLaboreCents == null
   const typicalNeed = annexIiiNeed(rbt12, input.payrollCents)
   let monthNeed = -Infinity
   let binding: { month: string; rbt12: number; n: number } | null = null
   for (const m of months) {
     const w = rbt12Of(m.month, m.cents)
-    const need = annexIiiNeed(w.rbt12, input.payrollCents)
+    const need = Math.max(annexIiiNeed(w.rbt12, input.payrollCents), tablesFor(m.month).minWage)
     if (need >= monthNeed) {
       monthNeed = need
       binding = { month: m.month, ...w }
     }
   }
-  const forAnnexIii = Math.max(MIN_WAGE, typicalNeed, monthNeed)
-  const basis = binding && monthNeed > Math.max(MIN_WAGE, typicalNeed) ? binding : null
+  const forAnnexIii = Math.max(refTables.minWage, typicalNeed, monthNeed)
+  const basis = binding && monthNeed > Math.max(refTables.minWage, typicalNeed) ? binding : null
   const gross = input.proLaboreCents ?? forAnnexIii
-  const owner = ownerTaxes(gross, input.dependents)
+  const owner = ownerTaxes(gross, input.dependents, refTables)
 
   // Simples with the user's pró-labore.
   const fs12 = (gross + input.payrollCents) * 12
   const fatorR = fatorROf(fs12, rbt12)
   const annex = annexFor(input.activity, fatorR)
-  const s = simples(annex, rbt12, average)
+  const s = simples(annex, rbt12, average, refTables)
 
   // MEI.
   const limit =
     opening && opening.slice(0, 4) === refYear
-      ? MEI_OPENING_MONTHLY_LIMIT * (13 - Number(opening.slice(5, 7)))
-      : MEI_ANNUAL_LIMIT
+      ? refTables.meiOpeningMonthlyLimit * (13 - Number(opening.slice(5, 7)))
+      : refTables.meiAnnualLimit
   const projection = yearToDate + average * (12 - refMonth)
   const status = meiStatus(yearToDate / limit)
   const projectedStatus = meiStatus(projection / limit)
@@ -352,7 +393,7 @@ export function mockTaxReport(input: TaxInput): TaxReport {
   // Annex III needs the Fator R at 28% (for Fator R activities); Annex V is the cheapest with the
   // minimum wage (or the fixed pró-labore).
   const iiiSc = simplesScenario(average, rbt12, ctx, input.activity === 'fatorR' ? Math.max(gross, forAnnexIii) : gross, 'III')
-  const vSc = simplesScenario(average, rbt12, ctx, MIN_WAGE, 'V')
+  const vSc = simplesScenario(average, rbt12, ctx, refTables.minWage, 'V')
   const presSc = scenario('presumido', average, rbt12, ctx)
   const overLimit = rbt12 > EPP_LIMIT
   const comparison: RegimeCost[] = [
@@ -397,12 +438,14 @@ export function mockTaxReport(input: TaxInput): TaxReport {
     taxFreeDistributionLimitCents: current.taxFreeLimit,
   }
 
-  // Month by month in the current regime: each month's revenue, costs and pró-labore. In the Simples
-  // each month has its own RBT12, Fator R and annex (and the pró-labore that keeps it in Anexo III).
-  const plInUse = input.regime === 'mei' ? 0 : input.regime === 'presumido' ? real.proLabore : gross
-  const plTaxes = input.regime === 'mei' ? { inss: 0, irrf: 0 } : ownerTaxes(plInUse, input.dependents)
+  // Month by month in the current regime, at the tables of each month: its revenue, costs and
+  // pró-labore. In the Simples each month has its own RBT12, Fator R and annex (and the pró-labore
+  // that keeps it in Anexo III).
   const cashFlow: CashFlowMonth[] = months.map((m) => {
     const revenue = m.cents
+    const t = tablesFor(m.month)
+    const plInUse = input.regime === 'mei' ? 0 : input.regime === 'presumido' ? (input.proLaboreCents ?? t.minWage) : gross
+    const plTaxes = input.regime === 'mei' ? { inss: 0, irrf: 0 } : ownerTaxes(plInUse, input.dependents, t)
     let company: number
     let simplesMonth: Pick<CashFlowMonth, 'rbt12Cents' | 'fatorR' | 'annex' | 'proLaboreForAnnexIiiCents'> = {
       rbt12Cents: null,
@@ -410,13 +453,13 @@ export function mockTaxReport(input: TaxInput): TaxReport {
       annex: null,
       proLaboreForAnnexIiiCents: null,
     }
-    if (input.regime === 'mei') company = MEI_DAS_SERVICES
+    if (input.regime === 'mei') company = sum(meiDas(t).map((s) => s.cents))
     else if (input.regime === 'presumido') company = presumido(revenue, plInUse, input.issRate).total
     else {
       const { rbt12: monthRbt12 } = rbt12Of(m.month, revenue)
       const monthFatorR = fatorROf(12 * (plInUse + input.payrollCents), monthRbt12)
       const monthAnnex = annexFor(input.activity, monthFatorR)
-      const das = simples(monthAnnex, monthRbt12, revenue)
+      const das = simples(monthAnnex, monthRbt12, revenue, t)
       // 6th bracket: the ISS is paid to the municipality, outside the DAS.
       company = das.das + (das.bracket === 6 ? Math.round(revenue * input.issRate) : 0)
       simplesMonth = {
@@ -486,7 +529,9 @@ export function mockTaxReport(input: TaxInput): TaxReport {
   if (projectedStatus !== 'within')
     warnings.push('No ritmo atual, o faturamento do ano passa do limite do MEI (R$ 81 mil).')
   warnings.push('Não considera retenções na fonte (IRRF, CSRF, ISS retido), 13º, férias nem outras receitas.')
-  warnings.push('Tabelas de 2026: salário mínimo de R$ 1.621,00 e teto do INSS de R$ 8.475,55.')
+  warnings.push(
+    `Tabelas de ${refTables.from.slice(0, 4)}: salário mínimo de ${formatBRLPlain(refTables.minWage)} e teto do INSS de ${formatBRLPlain(refTables.inssCeiling)}.`,
+  )
 
   return {
     referenceMonth: ref,
@@ -509,7 +554,7 @@ export function mockTaxReport(input: TaxInput): TaxReport {
       yearProjectionCents: projection,
       projectionRatio: projection / limit,
       projectedStatus,
-      dasCents: MEI_DAS_SERVICES,
+      dasCents: meiSc.companyTotal,
       itServicesAllowed: false,
     },
     simples: {
