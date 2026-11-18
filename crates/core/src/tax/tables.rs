@@ -967,6 +967,12 @@ mod tests {
             1,
         );
         assert!(parse(&broken).is_err());
+        let broken = BR_JSON.replacen(
+            "\"rbt12_window_offset\": 2",
+            "\"rbt12_window_offset\": 0",
+            1,
+        );
+        assert!(parse(&broken).unwrap_err().contains("rbt12_window_offset"));
         let broken = BR_JSON.replacen("\"inss\": \"O teto", "\"isss\": \"O teto", 1);
         assert!(parse(&broken)
             .unwrap_err()

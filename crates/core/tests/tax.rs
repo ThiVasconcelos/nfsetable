@@ -860,6 +860,40 @@ fn das_mei_with_cbs_and_ibs_in_2027() {
 }
 
 #[test]
+fn das_mei_by_year_from_2029_to_2033() {
+    // The INSS stays at 5% of the latest minimum wage in the tables (2026: 81,05); the ISS falls and
+    // the IBS grows (LC 123/2006, Anexo VII, included by LC 214/2025):
+    // 2029: 81,05 + ISS 4,50 + CBS 1,00 + IBS 0,20 = 86,75
+    // 2030: 81,05 + 4,00 + 1,00 + 0,40 = 86,45
+    // 2031: 81,05 + 3,50 + 1,00 + 0,60 = 86,15
+    // 2032: 81,05 + 3,00 + 1,00 + 0,80 = 85,85
+    // 2033: 81,05 + CBS 1,00 + IBS 2,00 = 84,05, with no ISS left.
+    let das = |year: u32| {
+        let mut tax = input(
+            &format!("{year}-03"),
+            months(&format!("{year}-01"), 3, 500_000),
+        );
+        tax.regime = TaxRegime::Mei;
+        let report = tax_report(&tax).unwrap();
+        let taxes: Vec<String> = regime(&report, "mei")
+            .company_taxes
+            .iter()
+            .map(|s| s.tax.clone())
+            .collect();
+        (report.mei.das_cents, taxes)
+    };
+    let with_iss = ["inss", "iss", "cbs", "ibs"];
+    assert_eq!(das(2029), (8_675, with_iss.map(String::from).to_vec()));
+    assert_eq!(das(2030).0, 8_645);
+    assert_eq!(das(2031).0, 8_615);
+    assert_eq!(das(2032), (8_585, with_iss.map(String::from).to_vec()));
+    assert_eq!(
+        das(2033),
+        (8_405, ["inss", "cbs", "ibs"].map(String::from).to_vec())
+    );
+}
+
+#[test]
 fn tables_follow_the_reference_month() {
     // Pró-labore 5.600 (automatic for 20.000/month), INSS 616,00, base 4.984,00.
     let irrf = |reference: &str| {
