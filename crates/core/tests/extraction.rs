@@ -72,6 +72,37 @@ fn danfse_v2_ignores_operation_value_and_ibs_cbs_column() {
     assert_eq!(competence(&doc), Some("2026-04-10"));
 }
 
+/// The layout of NT SE/CGNFS-e 008 v1.02 as the Receita Federal's generator draws it: every field
+/// present, '-' when empty, the IBS/CBS block and the "+ IBS/CBS" total next to the net value.
+#[test]
+fn danfse_nt008_layouts() {
+    // (file, net value, operation value, competence, y of the net value: totals row 2 + 0,30 cm)
+    let cases = [
+        ("danfse-nt008.pdf", 127_400, 130_000, "2026-04-10", 620.5),
+        // MEI: recipient and intermediary suppressed, so the totals move up 3,08 cm.
+        ("danfse-nt008-mei.pdf", 80_000, 80_000, "2026-05-15", 533.2),
+        // 2027: the net value + IBS/CBS (1.286,74) must not be taken for the net value.
+        (
+            "danfse-nt008-2027.pdf",
+            127_400,
+            130_000,
+            "2027-03-10",
+            620.5,
+        ),
+    ];
+    for (name, net, service, date, y) in cases {
+        let doc = extract(name);
+        assert_eq!(doc.status, Status::Ok, "{name}: {doc:?}");
+        assert_eq!(origin(&doc), Some(&danfse_origin()), "{name}");
+        assert_eq!(cents(&doc), Some(net), "{name}");
+        assert_eq!(service_cents(&doc), Some(service), "{name}");
+        assert_eq!(competence(&doc), Some(date), "{name}");
+        let bbox = doc.fields[NET_VALUE_FIELD].bbox;
+        assert!((bbox.x - 155.6).abs() < 2.0, "{name}: {bbox:?}");
+        assert!((bbox.y - y).abs() < 6.0, "{name}: {bbox:?}");
+    }
+}
+
 #[test]
 fn legacy_layout_uses_the_heuristic() {
     let doc = extract("legacy-municipal.pdf");

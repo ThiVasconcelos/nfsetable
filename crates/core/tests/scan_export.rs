@@ -40,6 +40,9 @@ fn scan_filters_sorts_and_finds_duplicates() {
         [
             "blank.pdf",
             "corrupt.pdf",
+            "danfse-nt008.pdf",
+            "danfse-nt008-2027.pdf",
+            "danfse-nt008-mei.pdf",
             "danfse-v1.pdf",
             "danfse-v1-copia.pdf",
             "danfse-v2.pdf",
@@ -76,7 +79,7 @@ fn scan_filters_sorts_and_finds_duplicates() {
 
     assert_eq!(result.sources.len(), 1);
     assert!(result.sources[0].is_dir && result.sources[0].exists);
-    assert_eq!(result.sources[0].file_count, 10);
+    assert_eq!(result.sources[0].file_count, 13);
 }
 
 #[test]
@@ -102,7 +105,7 @@ fn scan_recurses_accepts_files_and_reports_missing_sources() {
         exclude: vec!["CANCELÁDA".into()],
         known: vec![],
     });
-    assert_eq!(result.files.len(), 11);
+    assert_eq!(result.files.len(), 14);
     assert!(result.files.iter().any(|f| f.name == "danfse-v2-sub.pdf"));
     assert_eq!(
         result
