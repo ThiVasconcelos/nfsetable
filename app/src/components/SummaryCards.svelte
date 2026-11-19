@@ -49,7 +49,7 @@
     <span class="value num">{formatBRL(t.revenue)}</span>
     <span
       class="sub"
-      title={period.left ? `${periodTitle} (período)` : outside.length ? `${outside.join(' e ')} ficam fora dos totais` : undefined}
+      title={period.left ? `${periodTitle} (período)` : outside.length ? `${outside.join(' e ')} ${outsideCount === 1 ? 'fica' : 'ficam'} fora dos totais` : undefined}
     >
       {#if store.phase === 'extracting'}
         Lendo {formatInt(store.progress.done)} de {formatInt(store.progress.total)}…
