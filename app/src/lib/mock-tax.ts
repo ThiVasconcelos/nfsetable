@@ -20,16 +20,34 @@ import type {
 // ---------------------------------------------------------------- tables (cents)
 
 const INSS_RATE = 0.11
-/** Monthly IRRF table: [base up to, rate, deduction]. */
-const IRRF_TABLE: [number, number, number][] = [
-  [242_880, 0, 0],
-  [282_665, 0.075, 18_216],
-  [375_105, 0.15, 39_416],
-  [466_468, 0.225, 67_549],
-  [Infinity, 0.275, 90_873],
-]
+/** Monthly IRRF table: [base up to, rate, deduction] brackets and the simplified discount. */
+interface IrrfTable {
+  brackets: [number, number, number][]
+  simplified: number
+}
+/** February 2024 to April 2025 (Lei 11.482/2007 as worded by Lei 14.848/2024). */
+const IRRF_2024: IrrfTable = {
+  brackets: [
+    [225_920, 0, 0],
+    [282_665, 0.075, 16_944],
+    [375_105, 0.15, 38_144],
+    [466_468, 0.225, 66_277],
+    [Infinity, 0.275, 89_600],
+  ],
+  simplified: 56_480,
+}
+/** From May 2025 (Lei 11.482/2007 as worded by Lei 15.191/2025). */
+const IRRF_2025: IrrfTable = {
+  brackets: [
+    [242_880, 0, 0],
+    [282_665, 0.075, 18_216],
+    [375_105, 0.15, 39_416],
+    [466_468, 0.225, 67_549],
+    [Infinity, 0.275, 90_873],
+  ],
+  simplified: 60_720,
+}
 const IRRF_DEPENDENT = 18_959
-const IRRF_SIMPLIFIED = 60_720
 /** Withheld IRRF up to this amount is not withheld (Lei 9.430/1996, art. 67). */
 const IRRF_MIN_WITHHOLDING = 1_000
 /** Share of the minimum wage in the DAS-MEI (the owner's INSS). */
@@ -101,6 +119,7 @@ interface Tables {
   annex: Record<'III' | 'V', Bracket[]>
   /** How the effective rate above the ISS cap is split; absent: in proportion to the other taxes. */
   issExcess: Partial<Record<'III' | 'V', Record<string, number>>>
+  irrf: IrrfTable
   /** The IRRF reduction of Lei 15.270/2025 (from 2026). */
   irrfReduction: boolean
   /** The RBT12 window ends this many months before the month (2 from 2027 on). */
@@ -125,6 +144,7 @@ const TABLES_2026: Tables = {
     III: { irpj: 0.0602, csll: 0.0526, cofins: 0.1928, pis: 0.0418, cpp: 0.6526 },
     V: { irpj: 0.3007, csll: 0.1634, cofins: 0.1843, pis: 0.0399, cpp: 0.3117 },
   },
+  irrf: IRRF_2025,
   irrfReduction: true,
   windowOffset: 1,
   openingMonths: 0,
@@ -175,11 +195,13 @@ const TABLES_2029_ON: Tables[] = [
   { ...TABLES_2028, from: '2033-01', meiDasFixed: { cbs: 100, ibs: 200 }, meiNote: MEI_NOTE_2030 },
 ]
 
-/** 2025: the minimum wage and the INSS ceiling of 2025, no IRRF reduction yet. */
-const TABLES_2025: Tables = { ...TABLES_2026, from: '2025-01', minWage: 151_800, inssCeiling: 815_741, irrfReduction: false }
+/** 2025 from May: the minimum wage and the INSS ceiling of 2025, no IRRF reduction yet. */
+const TABLES_2025: Tables = { ...TABLES_2026, from: '2025-05', minWage: 151_800, inssCeiling: 815_741, irrfReduction: false }
+/** January to April 2025, and the months before them: the IRRF table of 2024. */
+const TABLES_2025_EARLY: Tables = { ...TABLES_2025, from: '2025-01', irrf: IRRF_2024 }
 
 /** Oldest first. */
-const TABLES: Tables[] = [TABLES_2025, TABLES_2026, TABLES_2027, TABLES_2028, ...TABLES_2029_ON]
+const TABLES: Tables[] = [TABLES_2025_EARLY, TABLES_2025, TABLES_2026, TABLES_2027, TABLES_2028, ...TABLES_2029_ON]
 
 /** The tables of `month` (yyyy-mm): the latest that started by then, the first ones before them. */
 function tablesFor(month: string): Tables {
@@ -200,9 +222,9 @@ const sum = (values: number[]) => values.reduce((a, b) => a + b, 0)
 
 function ownerTaxes(gross: number, dependents: number, t: Tables) {
   const inss = Math.round(Math.min(gross, t.inssCeiling) * INSS_RATE)
-  const deductions = Math.max(inss + dependents * IRRF_DEPENDENT, IRRF_SIMPLIFIED)
+  const deductions = Math.max(inss + dependents * IRRF_DEPENDENT, t.irrf.simplified)
   const base = Math.max(0, gross - deductions)
-  const [, rate, deduction] = IRRF_TABLE.find(([upTo]) => base <= upTo)!
+  const [, rate, deduction] = t.irrf.brackets.find(([upTo]) => base <= upTo)!
   const tax = Math.max(0, Math.round(base * rate - deduction))
   // Lei 15.270/2025 (from 2026): full reduction up to R$ 5.000, linear phase-out up to R$ 7.350.
   let reduction = 0
