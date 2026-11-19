@@ -100,15 +100,16 @@
   <dl class="grid">
     <div>
       <dt>Limite em {year}</dt>
-      <dd class="num">{formatBRL(mei.limitCents)}{#if openingYear}<span class="sub"> proporcional</span>{/if}</dd>
+      <dd class="num">{formatBRL(mei.limitCents)}{#if openingYear}{' '}<span class="sub">proporcional</span>{/if}</dd>
     </div>
     <div>
       <dt>DAS-MEI</dt>
       <dd class="num">{formatBRL(mei.dasCents)} <span class="sub">por mês</span></dd>
       {#if mei.dasSplit.length > 1}
         <dd class="parts">
+          <!-- Svelte trims the ends of an element's text: the spaces around the dot stay outside. -->
           {#each mei.dasSplit as share, i (share.tax)}
-            {#if i > 0}<span aria-hidden="true"> · </span>{/if}<span title={taxHint(share.tax)}
+            {#if i > 0}{' '}<span aria-hidden="true">·</span>{' '}{/if}<span class="part" title={taxHint(share.tax)}
               >{taxName(share.tax)} <span class="num">{formatAmount(share.cents)}</span></span
             >
           {/each}
@@ -219,9 +220,16 @@
     color: var(--text-3);
   }
 
+  /* Four parts from 2027: the line wraps between them, never inside one. */
   .parts {
     margin-top: 2px;
     font-size: 11.5px;
+    font-weight: 400;
     color: var(--text-3);
+    white-space: normal;
+  }
+
+  .part {
+    white-space: nowrap;
   }
 </style>
