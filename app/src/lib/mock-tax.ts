@@ -293,17 +293,25 @@ function share(shares: TaxShare[], tax: string): number {
   return shares.find((s) => s.tax === tax)?.cents ?? 0
 }
 
-/** `ceil(a / b)` for integers (b > 0). */
-const ceilDiv = (a: number, b: number) => -Math.floor(-a / b)
+/**
+ * `ceil(a × m / b)` for integers (b > 0), in BigInt: like the engine's decimals it stays exact past
+ * 2^53, where a float product rounds (the pricing search reaches R$ 10 trilhões).
+ */
+function ceilMulDiv(a: number, m: number, b: number): number {
+  const x = BigInt(Math.round(a)) * BigInt(m)
+  const y = BigInt(b)
+  const q = x / y
+  return Number(q * y < x ? q + 1n : q)
+}
 
 /**
- * Fator R = FS12 / RBT12, truncated to two decimals like the PGDAS-D (integer math): 0.01 without
- * payroll, 0.28 with payroll and no revenue.
+ * Fator R = FS12 / RBT12, truncated to two decimals like the PGDAS-D (integer math, in BigInt for
+ * the same reason): 0.01 without payroll, 0.28 with payroll and no revenue.
  */
 function fatorROf(fs12: number, rbt12: number): number {
   if (fs12 <= 0) return 0.01
   if (rbt12 <= 0) return 0.28
-  return Math.floor((fs12 * 100) / rbt12) / 100
+  return Number((BigInt(Math.round(fs12)) * 100n) / BigInt(Math.round(rbt12))) / 100
 }
 
 /** Anexo III for activities always taxed there or with the Fator R at 28%, else Anexo V. */
@@ -311,7 +319,7 @@ const annexFor = (activity: SimplesActivity, fatorR: number): 'III' | 'V' =>
   activity === 'annexIii' || fatorR >= 0.28 ? 'III' : 'V'
 
 /** 28% of a monthly revenue (RBT12 / 12) minus the other payroll, rounded up (integer math). */
-const annexIiiNeed = (rbt12: number, payroll: number) => ceilDiv(28 * rbt12, 1200) - payroll
+const annexIiiNeed = (rbt12: number, payroll: number) => ceilMulDiv(rbt12, 28, 1200) - payroll
 
 // ---------------------------------------------------------------- one scenario for a typical month
 
@@ -338,7 +346,7 @@ interface Context {
 
 function autoProLabore(average: number, payroll: number, t: Tables): number {
   // Integer math (no float noise), rounded up so the Fator R is not truncated below 28%.
-  return Math.max(t.minWage, Math.ceil((average * 28) / 100) - payroll)
+  return Math.max(t.minWage, ceilMulDiv(average, 28, 100) - payroll)
 }
 
 function scenario(regime: TaxRegime, average: number, rbt12: number, ctx: Context): Scenario {
