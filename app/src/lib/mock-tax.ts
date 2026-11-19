@@ -183,7 +183,7 @@ const TABLES_2028: Tables = {
 }
 
 const MEI_NOTE_2030 =
-  'O limite de R$ 140.000,00 supõe que as leis orçamentárias de 2027 a 2029 tenham considerado a renúncia de receita (LC 238/2026, art. 3º).'
+  'Os limites do MEI a partir de 2030 (R$ 140.000,00 por ano, ou R$ 11.666,67 por mês de atividade no ano de abertura) supõem que as leis orçamentárias de 2027 a 2029 tenham considerado a renúncia de receita (LC 238/2026, art. 3º).'
 
 /** DAS-MEI from 2029: the ISS falls and the IBS takes its place (no ISS from 2033). */
 const TABLES_2029_ON: Tables[] = [

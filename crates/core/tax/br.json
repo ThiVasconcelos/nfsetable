@@ -139,7 +139,7 @@
       "valid_to": null,
       "annual_limit": 140000.00,
       "opening_year_monthly_limit": 11666.67,
-      "note": "O limite de R$ 140.000,00 supõe que as leis orçamentárias de 2027 a 2029 tenham considerado a renúncia de receita (LC 238/2026, art. 3º).",
+      "note": "Os limites do MEI a partir de 2030 (R$ 140.000,00 por ano, ou R$ 11.666,67 por mês de atividade no ano de abertura) supõem que as leis orçamentárias de 2027 a 2029 tenham considerado a renúncia de receita (LC 238/2026, art. 3º).",
       "tolerance_ratio": 0.20,
       "it_services_allowed": false,
       "tax_free_distribution": {

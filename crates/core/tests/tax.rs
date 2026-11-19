@@ -532,10 +532,20 @@ fn mei_limit_of_2027() {
     tax.activity = SimplesActivity::AnnexIii;
     let report = tax_report(&tax).unwrap();
     assert_eq!(report.mei.limit_cents, 14_000_000);
-    // From 2030 only an assumption is stated.
+    // From 2030 only an assumption is stated, for both limits.
     assert!(has_warning(
         &report,
-        "supõe que as leis orçamentárias de 2027 a 2029"
+        "supõem que as leis orçamentárias de 2027 a 2029"
+    ));
+    // Opened in July 2030: 6 months (July to December) × 11.666,67 = 70.000,02, under the same
+    // assumption.
+    tax.opening_month = Some("2030-07".to_string());
+    tax.revenue_by_month = months("2030-07", 6, 900_000);
+    let report = tax_report(&tax).unwrap();
+    assert_eq!(report.mei.limit_cents, 7_000_002);
+    assert!(has_warning(
+        &report,
+        "ou R$ 11.666,67 por mês de atividade no ano de abertura) supõem"
     ));
     // No such caveat in 2026.
     let mut tax = input("2026-03", months("2026-01", 3, 500_000));
