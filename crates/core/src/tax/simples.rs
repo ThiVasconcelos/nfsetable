@@ -154,8 +154,9 @@ pub(crate) fn das(simples: &Simples, annex: Annex, rbt12: Decimal, revenue: Deci
 /// Each tax gets `base` × effective rate × its share (LC 123/2006, art. 18, § 1º-B), unrounded. The
 /// effective ISS is capped (5%): above the cap, the ISS stays at the cap and the rest of the
 /// effective rate is split by `iss_excess_split`, or, when the annex has none, among the other
-/// taxes in proportion to their shares in the bracket (LC 123/2006, art. 18, § 1º-B, I, included by
-/// LC 227/2026; the published splits follow it). The parts keep the canonical tax order.
+/// taxes in proportion to their shares in the bracket (LC 123/2006, art. 18, § 1º-B, I, as worded by
+/// LC 214/2025, art. 517, as amended by LC 227/2026, art. 174; the published splits follow it). The
+/// parts keep the canonical tax order.
 fn exact_parts(
     table: &AnnexTable,
     bracket: &SimplesBracket,

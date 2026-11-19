@@ -332,7 +332,7 @@
       }
     },
     {
-      "source": "LC 123/2006, art. 3º, I e II, art. 18, §§ 1º, 5º-K e 24 (RBT12 e folha dos 12 meses anteriores ao mês anterior, redação da LC 214/2025, art. 517), 1º-A, 1º-B, 5º-J e 5º-M, e Anexos III e V (redação da LC 214/2025, art. 519 e Anexos XX e XXII; Anexo XX com redação da LC 227/2026); Res. CGSN 140/2018, arts. 21, 22 (1ª faixa nos 2 primeiros meses de atividade, § 2º) e 26 (Fator R de 0,28 nesses meses, § 6º) e Anexos III e V (redação da Res. CGSN 190/2026). CBS e IBS no lugar de Cofins e PIS; no Anexo V não há tabela do excedente do ISS: vale o rateio proporcional do art. 18, § 1º-B, I (incluído pela LC 227/2026), e o teto de 5% não é atingido",
+      "source": "LC 123/2006, art. 3º, I e II, art. 18, §§ 1º, 5º-K e 24 (RBT12 e folha dos 12 meses anteriores ao mês anterior, redação da LC 214/2025, art. 517), 1º-A, 1º-B, 5º-J e 5º-M, e Anexos III e V (redação da LC 214/2025, art. 519 e Anexos XX e XXII; Anexo XX com redação da LC 227/2026); Res. CGSN 140/2018, arts. 21, 22 (1ª faixa nos 2 primeiros meses de atividade, § 2º) e 26 (Fator R de 0,28 nesses meses, § 6º) e Anexos III e V (redação da Res. CGSN 190/2026). CBS e IBS no lugar de Cofins e PIS; no Anexo V não há tabela do excedente do ISS: vale o rateio proporcional do art. 18, § 1º-B, I (redação da LC 214/2025, art. 517, incluída pela LC 227/2026, art. 174), e o teto de 5% não é atingido",
       "valid_from": "2027-01-01",
       "valid_to": "2028-12-31",
       "me_limit": 360000.00,
