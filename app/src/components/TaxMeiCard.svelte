@@ -100,7 +100,9 @@
   <dl class="grid">
     <div>
       <dt>Limite em {year}</dt>
-      <dd class="num">{formatBRL(mei.limitCents)}{#if openingYear}{' '}<span class="sub">proporcional</span>{/if}</dd>
+      <dd class="num limit">
+        <span class="amount">{formatBRL(mei.limitCents)}</span>{#if openingYear}{' '}<span class="sub">proporcional</span>{/if}
+      </dd>
     </div>
     <div>
       <dt>DAS-MEI</dt>
@@ -218,6 +220,15 @@
     font-size: 12px;
     font-weight: 400;
     color: var(--text-3);
+  }
+
+  /* In narrow windows "proporcional" goes under the amount instead of into the next column. */
+  .limit {
+    white-space: normal;
+  }
+
+  .amount {
+    white-space: nowrap;
   }
 
   /* Four parts from 2027: the line wraps between them, never inside one. */
