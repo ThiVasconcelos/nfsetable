@@ -215,7 +215,7 @@ fn json_shape_matches_the_frontend_types() {
     assert_eq!(value["type"], "anchor");
     assert_eq!(value["excludeSuffix"], "^\\s*\\+");
     assert_eq!(value["direction"], "below");
-    assert_eq!(value["maxDistance"], 24.0);
+    assert_eq!(value["maxDistance"], 14.0);
 
     let mut fields = BTreeMap::new();
     fields.insert(

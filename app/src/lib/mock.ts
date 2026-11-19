@@ -929,7 +929,7 @@ const BUILTIN_PROFILE: Profile = {
   kind: 'revenue',
   fields: {
     net_value: [
-      { type: 'anchor', pattern: 'valor\\s*liquido\\s*da\\s*nfs-?e', excludeSuffix: '^\\s*\\+', direction: 'below', maxDistance: 24 },
+      { type: 'anchor', pattern: 'valor\\s*liquido\\s*da\\s*nfs-?e', excludeSuffix: '^\\s*\\+', direction: 'below', maxDistance: 14 },
       { type: 'anchor', pattern: 'valor\\s*liquido\\s*da\\s*nfs-?e', excludeSuffix: '^\\s*\\+', direction: 'right', maxDistance: 250 },
     ],
   },

@@ -363,7 +363,10 @@ fn apply_anchor(
 ) -> Option<Token> {
     let tokens = tokens(page, kind);
     nearest_to_label(page, pattern, exclude, |line, label, end| match direction {
-        crate::model::Direction::Below => pick_below(label, &tokens, max_distance),
+        // An empty field of a DANFSe shows '-' (NT SE/CGNFS-e 008): nothing under this label, and
+        // nothing further down either (that would be the next row's value).
+        crate::model::Direction::Below => pick_below(label, &tokens, max_distance)
+            .filter(|(token, _)| !(kind == FieldKind::Text && is_dash(&token.raw))),
         crate::model::Direction::Right if kind == FieldKind::Text => {
             text_after(line, end, label, max_distance)
         }
@@ -527,6 +530,14 @@ fn tokens(page: &PageText, kind: FieldKind) -> Vec<Token> {
         }
     }
     out
+}
+
+/// Only dashes ('-', '–', '—'): how a DANFSe shows an empty field.
+fn is_dash(raw: &str) -> bool {
+    !raw.is_empty()
+        && raw
+            .chars()
+            .all(|c| matches!(c, '-' | '\u{2013}' | '\u{2014}'))
 }
 
 /// Nearest token below the label, aligned with it; distance = vertical gap.
@@ -795,6 +806,41 @@ mod tests {
             exclude_suffix: Some(r"^\s*\+".into()),
             direction,
             max_distance,
+        }
+    }
+
+    #[test]
+    fn a_dash_under_a_text_label_is_an_empty_field() {
+        let rule = Regex::new("situacao").unwrap();
+        let read = |words: &[(&str, f32, f32)]| {
+            apply_anchor(
+                &page(words),
+                FieldKind::Text,
+                &rule,
+                None,
+                Direction::Below,
+                24.0,
+            )
+            .map(|token| token.raw)
+        };
+        // The next row's cell, 12 pt below, is not taken for the empty one.
+        let empty = [
+            ("Situacao", 10.0, 100.0),
+            ("-", 10.0, 107.0),
+            ("Outro campo", 10.0, 118.0),
+        ];
+        assert_eq!(read(&empty), None);
+        let filled = [
+            ("Situacao", 10.0, 100.0),
+            ("ME/EPP", 10.0, 107.0),
+            ("Outro campo", 10.0, 118.0),
+        ];
+        assert_eq!(read(&filled).as_deref(), Some("ME/EPP"));
+        for dash in ["-", "–", "—", "--"] {
+            assert!(is_dash(dash), "{dash}");
+        }
+        for not_dash in ["", "-1", "R$ -", "a-b"] {
+            assert!(!is_dash(not_dash), "{not_dash}");
         }
     }
 

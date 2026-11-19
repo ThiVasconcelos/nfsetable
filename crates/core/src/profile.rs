@@ -224,7 +224,7 @@ mod tests {
         assert!(matches!(
             &rules[0],
             Rule::Anchor { direction: Direction::Below, max_distance, exclude_suffix: Some(_), .. }
-                if *max_distance == 24.0
+                if *max_distance == 14.0
         ));
         assert!(matches!(
             &rules[1],

@@ -12,7 +12,7 @@
         "pattern": "valor\\s*liquido\\s*da\\s*nfs-?e",
         "excludeSuffix": "^\\s*\\+",
         "direction": "below",
-        "maxDistance": 24
+        "maxDistance": 14
       },
       {
         "type": "anchor",
@@ -27,13 +27,13 @@
         "type": "anchor",
         "pattern": "valor\\s*do\\s*servico",
         "direction": "below",
-        "maxDistance": 24
+        "maxDistance": 14
       },
       {
         "type": "anchor",
         "pattern": "valor\\s*da\\s*operacao",
         "direction": "below",
-        "maxDistance": 24
+        "maxDistance": 14
       }
     ],
     "competence": [
@@ -41,13 +41,13 @@
         "type": "anchor",
         "pattern": "competencia\\s*da\\s*nfs-?e",
         "direction": "below",
-        "maxDistance": 24
+        "maxDistance": 14
       },
       {
         "type": "anchor",
         "pattern": "data\\s*e\\s*hora\\s*da\\s*emissao\\s*da\\s*nfs-?e",
         "direction": "below",
-        "maxDistance": 24
+        "maxDistance": 14
       }
     ]
   }
