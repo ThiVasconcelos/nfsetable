@@ -72,7 +72,7 @@
     <ul class="explain">
       <li><strong>Pró-labore</strong> é a retirada mensal do sócio, como um salário.</li>
       <li><strong>INSS:</strong> 11% do pró-labore, até o teto do INSS, descontados do sócio.</li>
-      <li><strong>IRRF:</strong> pela tabela mensal, já com a redução de 2026 (Lei 15.270/2025).</li>
+      <li><strong>IRRF:</strong> pela tabela mensal; a partir de 2026, com a redução da Lei 15.270/2025.</li>
       {#if fatorR}
         <li>
           <strong>Fator R:</strong> folha de 12 meses (pró-labore e salários) ÷ receita de 12 meses. Com 28% ou mais, o DAS
