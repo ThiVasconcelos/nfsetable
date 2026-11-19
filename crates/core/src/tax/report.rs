@@ -10,7 +10,7 @@ use super::scenarios::{
     self, Ctx, MeiOutlook, LABEL_MEI, LABEL_PRESUMIDO, LABEL_SIMPLES_III, LABEL_SIMPLES_V,
 };
 use super::simples::{self, Annex, Das};
-use super::tables::{CoverageStatus, Tables, TaxData};
+use super::tables::{CoverageStatus, OpeningRule, Tables, TaxData};
 use super::window;
 use super::Input;
 use crate::model::{
@@ -366,6 +366,38 @@ impl<'a> Estimate<'a> {
         }
     }
 
+    /// How the PGDAS-D taxes the first 13 months of activity from `opening`, each month by the
+    /// rule of its own tables, as the cash flow does: a company opened in 2026 has its 2027 months
+    /// under the 2027 rule.
+    fn opening_rules(&self, opening: Month) -> String {
+        let rule_at = |month: Month| self.data.tables(month).simples.opening.as_ref();
+        let describe = |rule: Option<&OpeningRule>| match rule {
+            Some(rule) => format!(
+                "nos {} primeiros meses de atividade o PGDAS-D usa a 1ª faixa e Fator R de {}, e \
+                 até o 13º mês a média dos meses anteriores ao mês anterior × 12",
+                rule.first_bracket_months,
+                percent(rule.fator_r)
+            ),
+            None => "nos primeiros meses o PGDAS-D usa a receita do 1º mês × 12 e depois a média \
+                     dos meses anteriores × 12"
+                .to_string(),
+        };
+        let first = rule_at(opening);
+        let change = (1..13)
+            .map(|k| opening.plus(k))
+            .find(|month| rule_at(*month).is_some() != first.is_some());
+        match change {
+            None => describe(first),
+            Some(at) => format!(
+                "até {}, {}; a partir de {}, {}",
+                at.plus(-1).display(),
+                describe(first),
+                at.display(),
+                describe(rule_at(at))
+            ),
+        }
+    }
+
     /// Some month considered has the RBT12 window of 2027 on (the 12 months before the previous
     /// one).
     fn lagged_window(&self) -> bool {
@@ -399,32 +431,25 @@ impl<'a> Estimate<'a> {
             brl(revenue.average)
         ));
         if revenue.annualized {
+            // Until 2026 the typical month follows the opening rule; from 2027 that rule is the 1st
+            // bracket in the first months, which the typical month does not model.
+            let like = if tables.simples.opening.is_none() {
+                ", como na regra de início de atividade"
+            } else {
+                ""
+            };
             warnings.push(format!(
-                "Com menos de 12 meses, o RBT12 foi estimado como a média × 12 ({}), como na regra \
-                 de início de atividade.",
+                "Com menos de 12 meses, o RBT12 foi estimado como a média × 12 ({}){like}.",
                 brl(revenue.rbt12)
             ));
         }
         if let Some(opening) = input.opening {
             let since = opening.months_until(input.reference);
             if opening.year == input.reference.year || (0..13).contains(&since) {
-                // The rule of the year the company opened in.
-                let months = match &self.data.tables(opening).simples.opening {
-                    Some(rule) => format!(
-                        "nos {} primeiros meses de atividade o PGDAS-D usa a 1ª faixa e Fator R de \
-                         {}, e até o 13º mês a média dos meses anteriores ao mês anterior × 12",
-                        rule.first_bracket_months,
-                        percent(rule.fator_r)
-                    ),
-                    None => {
-                        "nos primeiros meses o PGDAS-D usa a receita do 1º mês × 12 e depois a \
-                             média dos meses anteriores × 12"
-                            .to_string()
-                    }
-                };
                 warnings.push(format!(
                     "Regras do início de atividade simplificadas: no ano de abertura os limites da \
-                     ME e do Simples Nacional são proporcionais aos meses de atividade, e {months}."
+                     ME e do Simples Nacional são proporcionais aos meses de atividade, e {}.",
+                    self.opening_rules(opening)
                 ));
             }
         }

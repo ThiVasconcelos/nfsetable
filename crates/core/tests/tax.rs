@@ -858,13 +858,46 @@ fn opening_of_activity_in_2027() {
         "nos 2 primeiros meses de atividade o PGDAS-D usa a 1ª faixa e Fator R de 28%"
     ));
 
-    // A company opened in 2026 is told the rule of 2026, even with a 2027 reference month.
+    // A company opened in 2026 is told the rule of each of its first 13 months, as the cash flow
+    // computes them: the 2026 rule until 12/2026, the 2027 rule from 01/2027.
     let mut tax = input("2027-03", months("2026-06", 10, 1_000_000));
     tax.opening_month = Some("2026-06".to_string());
     let report = tax_report(&tax).unwrap();
     assert!(has_warning(
         &report,
-        "nos primeiros meses o PGDAS-D usa a receita do 1º mês × 12"
+        "até 12/2026, nos primeiros meses o PGDAS-D usa a receita do 1º mês × 12 e depois a média \
+         dos meses anteriores × 12; a partir de 01/2027, nos 2 primeiros meses de atividade"
+    ));
+    // Opened in December 2026: January 2027, its 2nd month, is at the 1st bracket with a Fator R
+    // of 28% (the 2027 rule), and the warning says so.
+    let mut tax = input(
+        "2027-01",
+        [
+            months("2026-12", 1, 2_000_000),
+            months("2027-01", 1, 2_000_000),
+        ]
+        .concat(),
+    );
+    tax.opening_month = Some("2026-12".to_string());
+    tax.pro_labore_cents = Some(162_100);
+    let report = tax_report(&tax).unwrap();
+    let january = &report.cash_flow[1];
+    assert_eq!(
+        (
+            january.rbt12_cents,
+            january.fator_r,
+            january.annex.as_deref()
+        ),
+        (Some(0), Some(0.28), Some("III"))
+    );
+    assert!(has_warning(
+        &report,
+        "a partir de 01/2027, nos 2 primeiros meses de atividade"
+    ));
+    // The typical month of an opening in 2027 is not "like the opening rule" any more.
+    assert!(!has_warning(
+        &report,
+        "como na regra de início de atividade"
     ));
 }
 
