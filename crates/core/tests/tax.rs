@@ -513,6 +513,19 @@ fn mei_limit_of_2027() {
         .as_deref()
         .unwrap()
         .contains("LC 238/2026, art. 3º"));
+    // Opened in January, 12 months at the monthly limit pass the annual one by 4 cents: the
+    // limit stays at the annual one. 2027: 12 × 9.166,67 = 110.000,04 → 110.000,00.
+    let mut tax = input("2027-03", months("2027-01", 3, 500_000));
+    tax.regime = TaxRegime::Mei;
+    tax.activity = SimplesActivity::AnnexIii;
+    tax.opening_month = Some("2027-01".to_string());
+    assert_eq!(tax_report(&tax).unwrap().mei.limit_cents, 11_000_000);
+    // 2028: 12 × 11.666,67 = 140.000,04 → 140.000,00.
+    let mut tax = input("2028-03", months("2028-01", 3, 500_000));
+    tax.regime = TaxRegime::Mei;
+    tax.activity = SimplesActivity::AnnexIii;
+    tax.opening_month = Some("2028-01".to_string());
+    assert_eq!(tax_report(&tax).unwrap().mei.limit_cents, 14_000_000);
     // The budget-law condition covers the budgets of 2027 to 2029 (LC 238/2026, art. 3º).
     let mut tax = input("2030-12", months("2030-05", 8, 1_100_000));
     tax.regime = TaxRegime::Mei;
