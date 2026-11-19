@@ -623,25 +623,45 @@ export function mockTaxReport(input: TaxInput): TaxReport {
     }
   })
 
-  // "Quanto cobrar": bisection on the monthly revenue of the current regime.
+  // "Quanto cobrar": the smallest monthly revenue of the current regime whose net reaches the
+  // target, searched like the engine (scenarios::required_revenue). The net is not monotonic (the
+  // ISS leaving the DAS in the 6th bracket, an IRRF of up to R$ 10 not withheld), so a plain
+  // bisection could land on a later crossing: from desired + costs, add the shortfall at each step,
+  // and on the first hit bisect back to the last miss when one cent less still reaches it.
   let pricing: TaxReport['pricing'] = null
-  if (input.desiredNetCents != null) {
-    const desired = input.desiredNetCents
+  let required: number | null = null
+  const desired = input.desiredNetCents
+  if (desired != null) {
     // In the Simples the price always assumes the automatic pró-labore, like the engine.
     const pricingCtx = input.regime === 'simples' ? { ...ctx, fixedProLabore: null } : ctx
     const netFor = (revenue: number) =>
       leftoverOf(revenue, costs, scenario(input.regime, revenue, revenue * 12, pricingCtx), reserveRate)
-    let lo = 0
-    let hi = Math.max(100_000, (desired + costs) * 4)
-    for (let i = 0; i < 60 && netFor(hi) < desired; i++) hi *= 2
-    for (let i = 0; i < 60; i++) {
-      const mid = Math.floor((lo + hi) / 2)
-      if (netFor(mid) >= desired) hi = mid
-      else lo = mid + 1
+    let revenue = Math.max(0, desired + costs)
+    let below: number | null = null
+    // The engine's limits: 1,000 steps and R$ 10 trilhões, past which there is no price.
+    for (let step = 0; step < 1_000 && revenue <= 1_000_000_000_000_000; step++) {
+      const value = netFor(revenue)
+      if (value >= desired) {
+        let hi = revenue
+        if (below != null && hi - 1 > below && netFor(hi - 1) >= desired) {
+          let lo = below
+          while (hi - lo > 1) {
+            const mid = lo + Math.floor((hi - lo) / 2)
+            if (netFor(mid) >= desired) hi = mid
+            else lo = mid
+          }
+        }
+        required = hi
+        break
+      }
+      below = revenue
+      revenue += desired - value
     }
+  }
+  if (desired != null && required != null) {
     pricing = {
       desiredNetCents: desired,
-      requiredRevenueCents: hi,
+      requiredRevenueCents: required,
       note:
         `Faturamento mensal para sobrarem ${formatBRLPlain(desired)} depois dos impostos, dos custos` +
         (reserveRate > 0 ? ` e da reserva de ${formatPercent(reserveRate)}` : '') +
