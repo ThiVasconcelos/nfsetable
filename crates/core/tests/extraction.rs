@@ -135,6 +135,12 @@ fn watermarks_classify_the_danfse() {
     assert!(nfsetable_core::is_watermark_type(&cancelled.doc_type));
     assert!(!nfsetable_core::is_watermark_type("NFS-e"));
     assert_eq!(cents(&cancelled), Some(127_400));
+    // Drawn twice on the page, each copy is the whole word.
+    let tiled = extract("danfse-nt008-watermark-tiled.pdf");
+    assert_eq!(
+        (tiled.doc_type.as_str(), cents(&tiled)),
+        ("Cancelada", Some(127_400))
+    );
     let substituted = extract("danfse-nt008-watermark-sub.pdf");
     assert_eq!(substituted.doc_type, "Substituída");
     assert_eq!(cents(&substituted), Some(80_000));

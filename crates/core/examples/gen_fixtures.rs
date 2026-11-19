@@ -786,6 +786,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &cancelled,
         Upright,
     )?;
+    // The watermark drawn twice, as generators that tile it do: two runs of one word each.
+    let mut tiled = danfse_nt008(Nt008::Me2026);
+    tiled.push(Text {
+        x: 60.0,
+        top: 400.0,
+        ..watermark("CANCELADA")
+    });
+    tiled.push(Text {
+        x: 200.0,
+        top: 750.0,
+        ..watermark("CANCELADA")
+    });
+    write_pdf(
+        pdfium,
+        &dir.join("danfse-nt008-watermark-tiled.pdf"),
+        &tiled,
+        Upright,
+    )?;
     let mut substituted = danfse_nt008(Nt008::Mei);
     substituted.push(watermark("SUBSTITUÍDA"));
     write_pdf(

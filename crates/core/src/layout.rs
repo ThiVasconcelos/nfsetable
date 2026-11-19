@@ -80,7 +80,8 @@ pub(crate) struct PageText {
     /// Sorted top to bottom, then left to right.
     pub lines: Vec<Line>,
     /// Runs of letters and digits drawn slanted (e.g. a watermark), in content order, out of the
-    /// lines: a run ends at an upright char or where the angle changes.
+    /// lines: a run ends at an upright char, where the angle changes or where the next char does
+    /// not follow along the baseline (a watermark drawn twice gives two runs).
     pub slanted: Vec<String>,
 }
 
@@ -174,14 +175,21 @@ impl Frame {
     }
 }
 
+/// The last char of a slanted run: its angle, origin (page space) and font size.
+struct RunEnd {
+    angle: f32,
+    origin: Option<(f32, f32)>,
+    size: f32,
+}
+
 /// Reads the visible chars of a page and builds its lines.
 pub(crate) fn page_text(page: &PdfPage<'_>) -> Result<PageText, PdfiumError> {
     let frame = Frame::of(page);
     let text = page.text()?;
     let mut glyphs = Vec::new();
     let mut slanted: Vec<String> = Vec::new();
-    // Angle of the slanted run being read; `None` after an upright char.
-    let mut run_angle: Option<f32> = None;
+    // The last char of the slanted run being read; `None` after an upright char.
+    let mut run_last: Option<RunEnd> = None;
     for ch in text.chars().iter() {
         let Some(c) = ch.unicode_char() else {
             continue;
@@ -198,15 +206,33 @@ pub(crate) fn page_text(page: &PdfPage<'_>) -> Result<PageText, PdfiumError> {
         let angle = ch.get_rotation_counter_clockwise_degrees();
         if is_slanted(angle) {
             if c.is_alphanumeric() {
-                match (run_angle, slanted.last_mut()) {
-                    (Some(run), Some(text)) if (run - angle).abs() <= 1.0 => text.push(c),
+                let origin = ch.origin().ok().map(|(x, y)| (x.value, y.value));
+                // The em in page space: the length of the matrix's vertical axis, whatever the
+                // angle (PDFium's scaled size takes only its `d`, which a rotation shrinks).
+                let scale = ch.matrix().map_or(1.0, |m| m.c().hypot(m.d()));
+                let size = (ch.unscaled_font_size().value * scale).max(1.0);
+                // The char continues the run when it follows the last one along the same baseline,
+                // within 1.5 em: a watermark drawn again elsewhere (tiled), or other slanted text,
+                // starts a run of its own.
+                let continues = run_last.as_ref().is_some_and(|last| {
+                    (last.angle - angle).abs() <= 1.0
+                        && origin.zip(last.origin).is_none_or(|((x, y), (lx, ly))| {
+                            (x - lx).hypot(y - ly) <= 1.5 * size.max(last.size)
+                        })
+                });
+                match slanted.last_mut() {
+                    Some(text) if continues => text.push(c),
                     _ => slanted.push(c.to_string()),
                 }
-                run_angle = Some(angle);
+                run_last = Some(RunEnd {
+                    angle,
+                    origin,
+                    size,
+                });
             }
             continue;
         }
-        run_angle = None;
+        run_last = None;
         let Ok(bounds) = ch.loose_bounds() else {
             continue;
         };
