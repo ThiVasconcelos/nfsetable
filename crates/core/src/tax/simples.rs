@@ -85,10 +85,12 @@ pub(crate) struct Das {
     /// states on the NFS-e and what a buyer in the regular regime can credit (Res. CGSN 140/2018,
     /// art. 58, as amended by Res. CGSN 190/2026).
     pub rates: Vec<(String, Decimal)>,
-    /// The bracket has no ISS inside the DAS (6th): the ISS is paid directly to the municipality.
+    /// The bracket has no ISS inside the DAS (6th): the estimate assumes the company barred from
+    /// paying it through the Simples for passing the sublimit (Res. CGSN 140/2018, art. 12), so the
+    /// ISS is paid directly to the municipality.
     pub iss_outside: bool,
-    /// The bracket has no IBS inside the DAS either (6th, from 2027); the IBS paid outside is not
-    /// estimated.
+    /// The bracket has no IBS inside the DAS either (6th, from 2027), on the same assumption; the
+    /// IBS paid outside is not estimated.
     pub ibs_outside: bool,
     /// The RBT12 is above the last bracket (the ceiling of the Simples Nacional).
     pub above_ceiling: bool,

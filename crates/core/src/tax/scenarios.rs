@@ -335,13 +335,19 @@ fn band_note(ctx: &Ctx, das: &Das) -> Option<String> {
         brl(simples.epp_limit)
     );
     if das.iss_outside {
+        let (taxes, ibs) = if das.ibs_outside {
+            (
+                "o ISS e o IBS",
+                "; o IBS pago à parte não entra nesta estimativa",
+            )
+        } else {
+            ("o ISS", "")
+        };
         note.push_str(&format!(
-            " Na 6ª faixa o ISS sai do DAS e é pago à parte ao município (considerado a {}).",
+            " Na 6ª faixa a estimativa supõe a empresa impedida de recolher {taxes} pelo Simples \
+             (sublimite ultrapassado): o ISS é pago à parte ao município (considerado a {}){ibs}.",
             percent(ctx.input.iss_rate)
         ));
-    }
-    if das.ibs_outside {
-        note.push_str(" O IBS também sai do DAS e não entra nesta estimativa.");
     }
     Some(note)
 }

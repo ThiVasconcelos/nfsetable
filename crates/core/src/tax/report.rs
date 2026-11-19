@@ -566,14 +566,22 @@ impl<'a> Estimate<'a> {
                 brl(simples.epp_limit)
             ));
         } else if das.iss_outside {
-            let ibs = if das.ibs_outside {
-                " O IBS também sai do DAS e não entra nesta estimativa."
+            // The 6th bracket alone keeps them in the DAS, at the rate of the 5th; they leave it
+            // when the company is barred for passing the sublimit, which the estimate assumes.
+            let (taxes, ibs, before) = if das.ibs_outside {
+                (
+                    "o ISS e o IBS",
+                    " e o IBS pago à parte não entra nesta estimativa",
+                    "os dois ficam",
+                )
             } else {
-                ""
+                ("o ISS", "", "ele fica")
             };
             warnings.push(format!(
-                "RBT12 de {} na 6ª faixa do Simples Nacional: o ISS sai do DAS e é pago à parte ao \
-                 município (considerado a {}).{ibs}",
+                "RBT12 de {} na 6ª faixa do Simples Nacional: a estimativa supõe a empresa já \
+                 impedida de recolher {taxes} pelo Simples por ter passado do sublimite (Res. CGSN \
+                 140/2018, art. 12): o ISS é pago à parte ao município (considerado a {}){ibs}. \
+                 Antes do impedimento, {before} no DAS pelo percentual da 5ª faixa.",
                 brl(self.revenue.rbt12),
                 percent(input.iss_rate)
             ));
