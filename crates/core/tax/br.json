@@ -11,7 +11,7 @@
     "pending": {
       "minimum_wage": "O salário mínimo de 2027 ainda não foi publicado: o DAS-MEI e o pró-labore usam o de 2026.",
       "inss": "O teto do INSS de 2027 ainda não foi publicado.",
-      "presumido": "Em 2027 o PIS e a Cofins acabam e entram a CBS e o IBS (LC 214/2025). A alíquota de referência da CBS de 2027 foi calculada pelo TCU em 11,3% e aguarda a resolução do Senado; a CBS cobrada será a referência menos 0,1 ponto, mais 0,1% de IBS. Até lá, o Lucro Presumido usa o PIS e a Cofins de 2026 (3,65%) e sai provavelmente subestimado."
+      "presumido": "Em 2027 o PIS e a Cofins acabam e entram a CBS e o IBS (LC 214/2025). A alíquota de referência da CBS de 2027 foi calculada pelo TCU em 11,3% e aguarda a resolução do Senado (sem ela, vale a do TCU); em 2027 a CBS cobrada será essa referência menos 0,1 ponto percentual, e o IBS será de 0,1%. Por enquanto, o Lucro Presumido usa o PIS e a Cofins de 2026 (3,65%) e sai provavelmente subestimado."
     }
   },
   "minimum_wage": [

@@ -147,7 +147,7 @@ const TABLES_2027: Tables = {
   openingMonths: 2,
   pending: [
     'O salário mínimo e o teto do INSS de 2027 ainda não foram publicados: usados os de 2026.',
-    'Em 2027 o PIS e a Cofins acabam e entram a CBS e o IBS; a CBS de 2027 (11,3% de referência pelo TCU) aguarda o Senado, então o Lucro Presumido ainda usa o PIS e a Cofins de 2026 e sai provavelmente subestimado.',
+    'Em 2027 o PIS e a Cofins acabam e entram a CBS e o IBS; a alíquota de referência da CBS de 2027 (11,3%, calculada pelo TCU) aguarda o Senado, então o Lucro Presumido ainda usa o PIS e a Cofins de 2026 e sai provavelmente subestimado.',
   ],
 }
 const TABLES_2028: Tables = {
