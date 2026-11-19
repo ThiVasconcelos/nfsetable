@@ -111,6 +111,18 @@ fn danfse_nt008_layouts() {
     }
 }
 
+/// A cancelled or substituted DANFSe is told by its watermark, whatever its file name.
+#[test]
+fn watermarks_classify_the_danfse() {
+    assert_eq!(extract("danfse-nt008.pdf").doc_type, "NFS-e");
+    let cancelled = extract("danfse-nt008-watermark.pdf");
+    assert_eq!(cancelled.doc_type, "Cancelada");
+    assert_eq!(cents(&cancelled), Some(127_400));
+    let substituted = extract("danfse-nt008-watermark-sub.pdf");
+    assert_eq!(substituted.doc_type, "Substituída");
+    assert_eq!(cents(&substituted), Some(80_000));
+}
+
 #[test]
 fn legacy_layout_uses_the_heuristic() {
     let doc = extract("legacy-municipal.pdf");

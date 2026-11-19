@@ -748,6 +748,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &cancelled,
         Upright,
     )?;
+    let mut substituted = danfse_nt008(Nt008::Mei);
+    substituted.push(watermark("SUBSTITUÍDA"));
+    write_pdf(
+        pdfium,
+        &dir.join("danfse-nt008-watermark-sub.pdf"),
+        &substituted,
+        Upright,
+    )?;
     write_pdf(
         pdfium,
         &dir.join("legacy-municipal.pdf"),

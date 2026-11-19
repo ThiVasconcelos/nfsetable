@@ -135,6 +135,24 @@ fn load(engine: &Engine, path: &Path, which: Pages) -> Result<LoadedDoc, CoreErr
     })
 }
 
+/// Document types of the watermarks of a DANFSe (NT SE/CGNFS-e 008, §§ 2.5.1 and 2.5.2), by their
+/// compacted text.
+const WATERMARK_TYPES: [(&str, &str); 2] =
+    [("cancelada", "Cancelada"), ("substituida", "Substituída")];
+
+/// The type a watermark gives the document: its slanted text says CANCELADA or SUBSTITUÍDA.
+fn watermark_type<'a>(pages: impl IntoIterator<Item = &'a PageText>) -> Option<&'static str> {
+    let slanted: String = pages
+        .into_iter()
+        .map(|page| page.slanted.as_str())
+        .collect();
+    let slanted = compact(&slanted);
+    WATERMARK_TYPES
+        .iter()
+        .find(|(text, _)| slanted.contains(text))
+        .map(|(_, doc_type)| *doc_type)
+}
+
 /// See [`Engine::extract`].
 pub(crate) fn extract_document(
     engine: &Engine,
@@ -181,6 +199,11 @@ pub(crate) fn extract_document(
     }
     if let Some(kind) = classifiers().find_map(|p| p.kind) {
         result.kind = kind;
+    }
+    // The watermark of a cancelled or substituted DANFSe wins over every profile: such a note is
+    // neither revenue nor expense. A type the user edits in the table still wins over it.
+    if let Some(doc_type) = watermark_type(doc.pages.iter().map(|(_, page)| page)) {
+        result.doc_type = doc_type.to_string();
     }
 
     if !doc.pages.iter().any(|(_, page)| page.has_text()) {
