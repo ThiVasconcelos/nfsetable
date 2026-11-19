@@ -1003,6 +1003,21 @@ fn opening_of_activity_in_2027() {
         &report,
         "como na regra de início de atividade"
     ));
+    // A period from the opening (01/2027) to 03/2028, past the 13th month: the cash flow still has
+    // 01 and 02/2027 at the 1st bracket, and the warning still tells the rule.
+    let mut tax = input("2028-03", months("2027-01", 15, 2_000_000));
+    tax.opening_month = Some("2027-01".to_string());
+    tax.pro_labore_cents = Some(500_000);
+    let report = tax_report(&tax).unwrap();
+    assert_eq!(report.cash_flow[0].rbt12_cents, Some(0));
+    assert!(has_warning(&report, "Regras do início de atividade"));
+    // Without a month of the first 13 in the period, none.
+    let mut tax = input("2028-06", months("2028-03", 4, 2_000_000));
+    tax.opening_month = Some("2027-01".to_string());
+    assert!(!has_warning(
+        &tax_report(&tax).unwrap(),
+        "Regras do início de atividade"
+    ));
 }
 
 #[test]

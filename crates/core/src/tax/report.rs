@@ -452,8 +452,13 @@ impl<'a> Estimate<'a> {
             ));
         }
         if let Some(opening) = input.opening {
-            let since = opening.months_until(input.reference);
-            if opening.year == input.reference.year || (0..13).contains(&since) {
+            // Whenever the reference month or a month of the cash flow is one of the first 13
+            // months of activity, whose rules the cash flow applies.
+            let early = |month: &Month| (0..13).contains(&opening.months_until(*month));
+            if opening.year == input.reference.year
+                || early(&input.reference)
+                || revenue.months.keys().any(early)
+            {
                 warnings.push(format!(
                     "Regras do início de atividade simplificadas: no ano de abertura os limites da \
                      ME e do Simples Nacional são proporcionais aos meses de atividade, e {}.",
