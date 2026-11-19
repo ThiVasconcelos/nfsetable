@@ -29,9 +29,11 @@ const TABLE_KEYS: [&str; 8] = [
     "presumido",
 ];
 
-/// Canonical order of the taxes of a split: the columns of the tables of LC 123/2006, IRPJ, CSLL,
-/// Cofins, PIS, CPP and ISS until 2026, and IRPJ, CSLL, CBS, CPP, ISS and IBS from 2027 (LC
-/// 214/2025, Anexos XX and XXII). Unknown taxes go after these, alphabetically.
+/// Canonical order of the taxes of a Simples split: the columns of the tables of LC 123/2006, IRPJ,
+/// CSLL, Cofins, PIS, CPP and ISS until 2026, and IRPJ, CSLL, CBS, CPP, ISS and IBS from 2027 (LC
+/// 214/2025, Anexos XX and XXII). Unknown taxes go after these, alphabetically. The DAS-MEI lists
+/// the INSS and then its fixed amounts, and the Lucro Presumido IRPJ, CSLL, PIS, Cofins, ISS and
+/// CPP, each in its own order.
 const TAX_ORDER: [&str; 8] = ["irpj", "csll", "cofins", "pis", "cbs", "cpp", "iss", "ibs"];
 
 static DATA: OnceLock<Result<TaxData, String>> = OnceLock::new();
