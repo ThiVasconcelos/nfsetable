@@ -192,6 +192,11 @@ fn mei_entry(ctx: &Ctx, outlook: &MeiOutlook) -> RegimeCost {
             brl(outlook.limit)
         ));
     }
+    // A condition of the limit (LC 238/2026) matters to whoever compares with the MEI too.
+    if let Some(caveat) = &ctx.tables.mei.note {
+        note.push(' ');
+        note.push_str(caveat);
+    }
     let cost = mei_cost(ctx.tables);
     regime_cost(
         ctx,

@@ -459,7 +459,7 @@ fn mei_limit_of_2027() {
         let report = tax_report(&tax).unwrap();
         assert_eq!(report.mei.limit_cents, 11_000_000);
         // The new limit depends on the budget law (LC 238/2026, art. 3º): the MEI is told.
-        assert!(has_warning(&report, "depende de a lei orçamentária"));
+        assert!(has_warning(&report, "dependem de a lei orçamentária"));
         (report.mei.year_to_date_cents, report.mei.status)
     };
     // 11 × 10.000,00 = 110.000,00 up to November: still within.
@@ -500,14 +500,30 @@ fn mei_limit_of_2027() {
         (report.mei.year_to_date_cents, report.mei.status),
         (8_800_000, MeiStatus::Within)
     );
-    assert!(has_warning(&report, "R$ 140.000,00 em 2028 e 2029"));
-    // The budget-law condition covers 2027 to 2029 only (LC 238/2026, art. 3º).
+    assert!(has_warning(&report, "Os limites do MEI de 2028 e 2029"));
+    assert!(has_warning(
+        &report,
+        "ou R$ 6.750,00 por mês de atividade no ano de abertura"
+    ));
+    // The comparison's MEI row carries the condition for any regime.
+    tax.regime = TaxRegime::Simples;
+    let report = tax_report(&tax).unwrap();
+    assert!(regime(&report, "mei")
+        .note
+        .as_deref()
+        .unwrap()
+        .contains("LC 238/2026, art. 3º"));
+    // The budget-law condition covers the budgets of 2027 to 2029 (LC 238/2026, art. 3º).
     let mut tax = input("2030-12", months("2030-05", 8, 1_100_000));
     tax.regime = TaxRegime::Mei;
     tax.activity = SimplesActivity::AnnexIii;
     let report = tax_report(&tax).unwrap();
     assert_eq!(report.mei.limit_cents, 14_000_000);
-    assert!(!has_warning(&report, "lei orçamentária"));
+    // From 2030 only an assumption is stated.
+    assert!(has_warning(
+        &report,
+        "supõe que as leis orçamentárias de 2027 a 2029"
+    ));
     // No such caveat in 2026.
     let mut tax = input("2026-03", months("2026-01", 3, 500_000));
     tax.regime = TaxRegime::Mei;

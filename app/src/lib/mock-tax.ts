@@ -136,7 +136,8 @@ const TABLES_2027: Tables = {
   from: '2027-01',
   meiAnnualLimit: 11_000_000,
   meiOpeningMonthlyLimit: 916_667,
-  meiNote: 'O limite de R$ 110.000,00 em 2027 depende de a lei orçamentária considerar a renúncia de receita (LC 238/2026, art. 3º); sem isso, continua R$ 81.000,00.',
+  meiNote:
+    'Os limites do MEI de 2027 (R$ 110.000,00 por ano, ou R$ 9.166,67 por mês de atividade no ano de abertura) dependem de a lei orçamentária considerar a renúncia de receita (LC 238/2026, art. 3º); sem isso, ficam em R$ 81.000,00 (ou R$ 6.750,00 por mês de atividade no ano de abertura).',
   // LC 214/2025, Anexo XXIII: CBS 0,994 and IBS 0,006, each rounded to the cent.
   meiDasFixed: { iss: 500, cbs: 99, ibs: 1 },
   annex: ANNEX_2027,
@@ -154,20 +155,24 @@ const TABLES_2028: Tables = {
   from: '2028-01',
   meiAnnualLimit: 14_000_000,
   meiOpeningMonthlyLimit: 1_166_667,
-  meiNote: 'O limite de R$ 140.000,00 em 2028 e 2029 depende de a lei orçamentária considerar a renúncia de receita (LC 238/2026, art. 3º); sem isso, continua R$ 81.000,00.',
+  meiNote:
+    'Os limites do MEI de 2028 e 2029 (R$ 140.000,00 por ano, ou R$ 11.666,67 por mês de atividade no ano de abertura) dependem de a lei orçamentária de cada ano considerar a renúncia de receita (LC 238/2026, art. 3º); sem isso, ficam em R$ 81.000,00 (ou R$ 6.750,00 por mês de atividade no ano de abertura).',
   pending: [
     'As regras de 2028 em diante estão incompletas: faltam salário mínimo, INSS, o Lucro Presumido com CBS e IBS e, a partir de 2029, as tabelas do Simples Nacional da troca do ISS pelo IBS.',
   ],
 }
 
+const MEI_NOTE_2030 =
+  'O limite de R$ 140.000,00 supõe que as leis orçamentárias de 2027 a 2029 tenham considerado a renúncia de receita (LC 238/2026, art. 3º).'
+
 /** DAS-MEI from 2029: the ISS falls and the IBS takes its place (no ISS from 2033). */
 const TABLES_2029_ON: Tables[] = [
   { ...TABLES_2028, from: '2029-01', meiDasFixed: { iss: 450, cbs: 100, ibs: 20 } },
-  // From 2030 the MEI limit no longer depends on the budget law (LC 238/2026, art. 3º).
-  { ...TABLES_2028, from: '2030-01', meiDasFixed: { iss: 400, cbs: 100, ibs: 40 }, meiNote: undefined },
-  { ...TABLES_2028, from: '2031-01', meiDasFixed: { iss: 350, cbs: 100, ibs: 60 }, meiNote: undefined },
-  { ...TABLES_2028, from: '2032-01', meiDasFixed: { iss: 300, cbs: 100, ibs: 80 }, meiNote: undefined },
-  { ...TABLES_2028, from: '2033-01', meiDasFixed: { cbs: 100, ibs: 200 }, meiNote: undefined },
+  // From 2030 the limit assumes the budget laws of 2027 to 2029 took the waiver into account.
+  { ...TABLES_2028, from: '2030-01', meiDasFixed: { iss: 400, cbs: 100, ibs: 40 }, meiNote: MEI_NOTE_2030 },
+  { ...TABLES_2028, from: '2031-01', meiDasFixed: { iss: 350, cbs: 100, ibs: 60 }, meiNote: MEI_NOTE_2030 },
+  { ...TABLES_2028, from: '2032-01', meiDasFixed: { iss: 300, cbs: 100, ibs: 80 }, meiNote: MEI_NOTE_2030 },
+  { ...TABLES_2028, from: '2033-01', meiDasFixed: { cbs: 100, ibs: 200 }, meiNote: MEI_NOTE_2030 },
 ]
 
 /** 2025: the minimum wage and the INSS ceiling of 2025, no IRRF reduction yet. */
@@ -508,7 +513,8 @@ export function mockTaxReport(input: TaxInput): TaxReport {
       : 'DAS fixo; o INSS do titular já está no DAS.') +
     (projectedStatus !== 'within'
       ? ` No ritmo atual, a receita do ano chega a ${formatBRLPlain(projection)}, acima do limite do MEI (${formatBRLPlain(limit)}).`
-      : '')
+      : '') +
+    (refTables.meiNote ? ` ${refTables.meiNote}` : '')
   // Annex III needs the Fator R at 28% (for Fator R activities); Annex V is the cheapest with the
   // minimum wage (or the fixed pró-labore).
   const iiiSc = simplesScenario(average, rbt12, ctx, input.activity === 'fatorR' ? Math.max(gross, forAnnexIii) : gross, 'III')
