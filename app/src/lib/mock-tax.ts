@@ -546,6 +546,12 @@ export function mockTaxReport(input: TaxInput): TaxReport {
   const vTyped = typed != null && (typed < forAnnexIii || input.activity !== 'fatorR')
   const vPl = vTyped ? typed : refTables.minWage
   const vSc = simplesScenario(average, rbt12, ctx, vPl, 'V')
+  // Like the engine: that pró-labore may already reach the Fator R of 28%, and Anexo V is then
+  // only a reference.
+  const vReaches = fatorROf((vPl + input.payrollCents) * 12, rbt12) >= 0.28
+  const vWhat = vTyped
+    ? `o pró-labore informado (${formatBRLPlain(vPl)})`
+    : `pró-labore de um salário mínimo (${formatBRLPlain(vPl)})`
   const presSc = scenario('presumido', average, rbt12, ctx)
   const overLimit = rbt12 > EPP_LIMIT
   const comparison: RegimeCost[] = [
@@ -563,9 +569,9 @@ export function mockTaxReport(input: TaxInput): TaxReport {
       !overLimit && input.activity === 'fatorR',
       input.activity !== 'fatorR'
         ? 'Esta atividade é sempre tributada no Anexo III.'
-        : vTyped
-          ? `Com o pró-labore informado (${formatBRLPlain(vSc.proLabore)}) o Fator R fica abaixo de 28% e a receita vai para o Anexo V.`
-          : `Com pró-labore de um salário mínimo (${formatBRLPlain(vSc.proLabore)}), Fator R abaixo de 28%.`,
+        : vReaches
+          ? `Com ${vWhat} o Fator R já chega a 28% e a receita iria para o Anexo III; o Anexo V aparece só como referência.`
+          : `Com ${vWhat} o Fator R fica abaixo de 28% e a receita vai para o Anexo V.`,
       vSc,
     ),
     cost('presumido', 'Lucro Presumido', true, `ISS de ${formatPercent(input.issRate)} e CPP de 20% sobre o pró-labore.`, presSc),
