@@ -1058,6 +1058,26 @@ fn reference_month_outside_the_tables() {
         .collect();
     assert_eq!(flow_warnings.len(), 1, "{:?}", report.warnings);
 
+    // A reference month past the tables (2028) warns only about the coverage; the 2027 months of
+    // the period still get the warnings of their own gaps, once each.
+    let mut tax = input("2028-01", months("2027-11", 3, 1_000_000));
+    tax.regime = TaxRegime::Presumido;
+    let report = tax_report(&tax).unwrap();
+    assert!(has_warning(
+        &report,
+        "O mês de referência (01/2028) é posterior"
+    ));
+    for table in ["Salário mínimo;", "INSS do pró-labore;", "Lucro Presumido;"] {
+        let found = report
+            .warnings
+            .iter()
+            .filter(|w| {
+                w.starts_with("Tabela não incluída para 11/2027 a 12/2027:") && w.contains(table)
+            })
+            .count();
+        assert_eq!(found, 1, "{table} {:?}", report.warnings);
+    }
+
     let report = tax_report(&input("2024-06", months("2024-04", 3, 500_000))).unwrap();
     // Uses the nearest (2025) tables: minimum wage 1.518,00.
     assert_eq!(report.pro_labore.gross_cents, 151_800);

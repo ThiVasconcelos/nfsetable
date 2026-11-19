@@ -29,8 +29,8 @@ enum Gap {
 }
 
 /// Warnings about the tables of the reference month and, since each month of the cash flow uses
-/// its own tables, about the other months considered: once per gap the reference month does not
-/// have, naming the months it affects.
+/// its own tables, about the other months considered: once per gap the reference month's warnings
+/// do not already name, naming the months it affects.
 pub(crate) fn coverage_warnings(
     data: &'static TaxData,
     tables: &Tables,
@@ -39,11 +39,16 @@ pub(crate) fn coverage_warnings(
     warnings: &mut Vec<String>,
 ) {
     reference_coverage_warnings(tables, reference, warnings);
-    let reference_gaps: Vec<Gap> = tables
-        .fallbacks
-        .iter()
-        .map(|f| Gap::Table(f.label, f.used_from, f.note))
-        .collect();
+    // Only a reference month within the tables warns about its fallbacks; outside them it gets the
+    // coverage note alone, so the other months' fallbacks are all still to be told.
+    let reference_gaps: Vec<Gap> = match tables.coverage {
+        CoverageStatus::Within => tables
+            .fallbacks
+            .iter()
+            .map(|f| Gap::Table(f.label, f.used_from, f.note))
+            .collect(),
+        _ => Vec::new(),
+    };
     let mut groups: Vec<(Gap, Vec<Month>)> = Vec::new();
     for month in months.into_iter().filter(|m| *m != reference) {
         let month_tables = data.tables(month);
