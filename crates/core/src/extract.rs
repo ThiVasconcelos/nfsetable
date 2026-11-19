@@ -397,9 +397,11 @@ fn apply_anchor(
         }
         crate::model::Direction::Right => pick_right(label, &tokens, max_distance),
     })
-    // An empty field of a DANFSe shows '-' (NT SE/CGNFS-e 008). When the nearest cell is a dash the
-    // field is empty: not the next row's value, nor the cell of another occurrence of the label
-    // (NT 008 repeats Telefone, E-mail and others for each party).
+    // An empty field of a DANFSe shows '-' (NT SE/CGNFS-e 008). When the nearest cell of a text
+    // field is a dash the field is empty: not the next row's value, nor the cell of another
+    // occurrence of the label (NT 008 repeats Telefone, E-mail and others for each party). Money
+    // and dates have no dash token: the Receita's generator always prints the cells the built-in
+    // profile reads, and were one a dash, the heuristic could still read the row below it.
     .filter(|token| !(kind == FieldKind::Text && is_dash(&token.raw)))
 }
 
