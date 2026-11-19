@@ -699,9 +699,12 @@ export function mockTaxReport(input: TaxInput): TaxReport {
 
   const warnings: string[] = []
   if (input.regime === 'mei' && refTables.meiNote) warnings.push(refTables.meiNote)
+  // From 2027 the opening rule is the 1st bracket in the first months, which the typical month
+  // does not model: the estimate is no longer "the rule of new companies".
   if (annualized)
     warnings.push(
-      `Com ${count === 1 ? '1 mês' : `${count} meses`}, o RBT12 foi estimado pela média × 12 (regra das empresas novas).`,
+      `Com ${count === 1 ? '1 mês' : `${count} meses`}, o RBT12 foi estimado pela média × 12` +
+        (refTables.openingMonths ? '.' : ' (regra das empresas novas).'),
     )
   if (input.activity === 'fatorR' && annex === 'V')
     warnings.push(
