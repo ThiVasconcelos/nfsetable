@@ -405,9 +405,14 @@ fn apply_anchor(
     .filter(|token| !(kind == FieldKind::Text && is_dash(&token.raw)))
 }
 
+/// Distances within this many points are a tie: positions carry f32 noise (about 0.0001 pt), so the
+/// cells under a label repeated for each party of a DANFSe are never exactly as near. It stays
+/// below the 0.01 pt per point of misalignment `pick_below` adds, so real differences still count.
+const TIE_DISTANCE: f32 = 0.001;
+
 /// The nearest value over every occurrence of the label on the page: `pick` turns one occurrence
 /// (its line, its box and where it ends in the normalized text) into a value and its distance.
-/// The first of equally near values wins.
+/// The first in reading order of the values within `TIE_DISTANCE` of the nearest wins.
 fn nearest_to_label(
     page: &PageText,
     pattern: &Regex,
@@ -422,7 +427,10 @@ fn nearest_to_label(
                 .map(move |(label, end)| (line, label, end))
         })
         .filter_map(|(line, label, end)| pick(line, &label, end))
-        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .fold(None, |best: Option<(Token, f32)>, next| match best {
+            Some(best) if next.1 >= best.1 - TIE_DISTANCE => Some(best),
+            _ => Some(next),
+        })
         .map(|(token, _)| token)
 }
 
@@ -927,6 +935,30 @@ mod tests {
             ("ME/EPP", 10.0, 207.0),
         ];
         assert_eq!(read(&repeated), None);
+        // Also when float noise makes the later cell nearer by a hair (0.0001 pt), and the other
+        // way round: the first occurrence decides.
+        let noisy = [
+            ("Situacao", 10.0, 100.0),
+            ("ME/EPP", 10.0, 107.0),
+            ("Situacao", 10.0, 200.0),
+            ("-", 10.0, 206.9999),
+        ];
+        assert_eq!(read(&noisy).as_deref(), Some("ME/EPP"));
+        let noisy = [
+            ("Situacao", 10.0, 100.0),
+            ("-", 10.0, 107.0),
+            ("Situacao", 10.0, 200.0),
+            ("ME/EPP", 10.0, 206.9999),
+        ];
+        assert_eq!(read(&noisy), None);
+        // A cell nearer by a real amount still wins.
+        let nearer = [
+            ("Situacao", 10.0, 100.0),
+            ("-", 10.0, 107.0),
+            ("Situacao", 10.0, 200.0),
+            ("ME/EPP", 10.0, 206.0),
+        ];
+        assert_eq!(read(&nearer).as_deref(), Some("ME/EPP"));
         for dash in ["-", "–", "—", "--"] {
             assert!(is_dash(dash), "{dash}");
         }
