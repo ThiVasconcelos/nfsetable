@@ -71,6 +71,9 @@ const MSG_NOT_FOUND: &str =
 #[derive(Debug, Clone)]
 struct Token {
     rect: Rect,
+    /// `rect` in the frame of the page's tilted text (see `layout::untilted`), for the geometry of
+    /// anchor rules; `rect` itself on an upright page.
+    frame: Rect,
     raw: String,
     cents: Option<i64>,
     date: Option<String>,
@@ -82,6 +85,7 @@ impl Token {
     fn text(rect: Rect, text: String) -> Token {
         Token {
             rect,
+            frame: rect,
             raw: text.clone(),
             cents: None,
             date: None,
@@ -390,12 +394,12 @@ fn apply_anchor(
     max_distance: f32,
 ) -> Option<Token> {
     let tokens = tokens(page, kind);
-    nearest_to_label(page, pattern, exclude, |line, label, end| match direction {
-        crate::model::Direction::Below => pick_below(label, &tokens, max_distance),
+    nearest_to_label(page, pattern, exclude, |line, label| match direction {
+        crate::model::Direction::Below => pick_below(&label.frame, &tokens, max_distance),
         crate::model::Direction::Right if kind == FieldKind::Text => {
-            text_after(line, end, label, max_distance)
+            text_after(line, label.end, &label.rect, max_distance)
         }
-        crate::model::Direction::Right => pick_right(label, &tokens, max_distance),
+        crate::model::Direction::Right => pick_right(&label.frame, &tokens, max_distance),
     })
     // An empty field of a DANFSe shows '-' (NT SE/CGNFS-e 008). When the nearest cell of a text
     // field is a dash the field is empty: not the next row's value, nor the cell of another
@@ -411,22 +415,22 @@ fn apply_anchor(
 const TIE_DISTANCE: f32 = 0.001;
 
 /// The nearest value over every occurrence of the label on the page: `pick` turns one occurrence
-/// (its line, its box and where it ends in the normalized text) into a value and its distance.
+/// (its line and the label) into a value and its distance.
 /// The first in reading order of the values within `TIE_DISTANCE` of the nearest wins.
 fn nearest_to_label(
     page: &PageText,
     pattern: &Regex,
     exclude: Option<&Regex>,
-    mut pick: impl FnMut(&Line, &Rect, usize) -> Option<(Token, f32)>,
+    mut pick: impl FnMut(&Line, &Label) -> Option<(Token, f32)>,
 ) -> Option<Token> {
     page.lines
         .iter()
         .flat_map(|line| {
-            label_matches(line, pattern, exclude)
+            label_matches(line, pattern, exclude, page.tilt)
                 .into_iter()
-                .map(move |(label, end)| (line, label, end))
+                .map(move |label| (line, label))
         })
-        .filter_map(|(line, label, end)| pick(line, &label, end))
+        .filter_map(|(line, label)| pick(line, &label))
         .fold(None, |best: Option<(Token, f32)>, next| match best {
             Some(best) if next.1 >= best.1 - TIE_DISTANCE => Some(best),
             _ => Some(next),
@@ -472,9 +476,9 @@ fn apply_auto(
         return None;
     }
     labels.iter().find_map(|(pattern, exclude)| {
-        nearest_to_label(page, pattern, exclude.as_ref(), |_, label, _| {
-            pick_right(label, &tokens, AUTO_RIGHT_DISTANCE)
-                .or_else(|| pick_below(label, &tokens, AUTO_BELOW_DISTANCE))
+        nearest_to_label(page, pattern, exclude.as_ref(), |_, label| {
+            pick_right(&label.frame, &tokens, AUTO_RIGHT_DISTANCE)
+                .or_else(|| pick_below(&label.frame, &tokens, AUTO_BELOW_DISTANCE))
         })
     })
 }
@@ -498,10 +502,10 @@ fn apply_region(
             let mut candidates: Vec<Rect> = page
                 .lines
                 .iter()
-                .flat_map(|line| label_matches(line, &pattern, None))
-                .map(|(found, _)| Rect {
-                    x: found.x + anchor.dx,
-                    y: found.y + anchor.dy,
+                .flat_map(|line| label_matches(line, &pattern, None, 0.0))
+                .map(|found| Rect {
+                    x: found.rect.x + anchor.dx,
+                    y: found.rect.y + anchor.dy,
                     w: anchor.w,
                     h: anchor.h,
                 })
@@ -521,13 +525,26 @@ fn apply_region(
     read_rect(page, &absolute, kind)
 }
 
-/// Label occurrences on a line: (box of the label, byte end of the match in `line.norm`).
-fn label_matches(line: &Line, pattern: &Regex, exclude: Option<&Regex>) -> Vec<(Rect, usize)> {
+/// A label occurrence on a line.
+struct Label {
+    rect: Rect,
+    /// `rect` in the frame of the page's tilted text (see `layout::untilted`).
+    frame: Rect,
+    /// Byte end of the match in `line.norm`.
+    end: usize,
+}
+
+/// Label occurrences on a line of a page whose text is tilted `tilt` degrees.
+fn label_matches(line: &Line, pattern: &Regex, exclude: Option<&Regex>, tilt: f32) -> Vec<Label> {
     pattern
         .find_iter(&line.norm)
         .filter(|m| m.start() < m.end())
         .filter(|m| exclude.is_none_or(|ex| !ex.is_match(&line.norm[m.end()..])))
-        .map(|m| (line.norm_span_rect(m.start(), m.end()), m.end()))
+        .map(|m| Label {
+            rect: line.norm_span_rect(m.start(), m.end()),
+            frame: line.norm_span_untilted(m.start(), m.end(), tilt),
+            end: m.end(),
+        })
         .collect()
 }
 
@@ -540,6 +557,7 @@ fn tokens(page: &PageText, kind: FieldKind) -> Vec<Token> {
                 for m in find_money(&line.raw) {
                     out.push(Token {
                         rect: line.raw_span_rect(m.start, m.end),
+                        frame: line.raw_span_untilted(m.start, m.end, page.tilt),
                         raw: line.raw[m.start..m.end].trim().to_string(),
                         cents: Some(m.cents),
                         date: None,
@@ -551,6 +569,7 @@ fn tokens(page: &PageText, kind: FieldKind) -> Vec<Token> {
                 for d in find_dates(&line.raw) {
                     out.push(Token {
                         rect: line.raw_span_rect(d.start, d.end),
+                        frame: line.raw_span_untilted(d.start, d.end, page.tilt),
                         raw: line.raw[d.start..d.end].to_string(),
                         cents: None,
                         date: Some(d.iso),
@@ -562,7 +581,10 @@ fn tokens(page: &PageText, kind: FieldKind) -> Vec<Token> {
                 for segment in &line.segments {
                     let raw = line.raw[segment.raw.clone()].trim();
                     if !raw.is_empty() {
-                        out.push(Token::text(segment.rect, raw.to_string()));
+                        out.push(Token {
+                            frame: line.segment_untilted(segment, page.tilt),
+                            ..Token::text(segment.rect, raw.to_string())
+                        });
                     }
                 }
             }
@@ -579,28 +601,30 @@ fn is_dash(raw: &str) -> bool {
             .all(|c| matches!(c, '-' | '\u{2013}' | '\u{2014}'))
 }
 
-/// Nearest token below the label, aligned with it; distance = vertical gap.
+/// Nearest token below the label, aligned with it; distance = vertical gap. Both boxes are in the
+/// frame of the page's tilted text (`frame`).
 fn pick_below(label: &Rect, tokens: &[Token], max_distance: f32) -> Option<(Token, f32)> {
     tokens
         .iter()
-        .filter(|t| t.rect.y >= label.bottom() - 2.0 && t.rect.y <= label.bottom() + max_distance)
-        .filter(|t| t.rect.overlap_x(label) > 0.0 || (t.rect.x - label.x).abs() <= 8.0)
+        .filter(|t| t.frame.y >= label.bottom() - 2.0 && t.frame.y <= label.bottom() + max_distance)
+        .filter(|t| t.frame.overlap_x(label) > 0.0 || (t.frame.x - label.x).abs() <= 8.0)
         .map(|t| {
-            let vertical = (t.rect.y - label.bottom()).max(0.0);
+            let vertical = (t.frame.y - label.bottom()).max(0.0);
             // Tokens of the same row: prefer the one aligned with the label.
-            (t, vertical + 0.01 * (t.rect.x - label.x).abs())
+            (t, vertical + 0.01 * (t.frame.x - label.x).abs())
         })
         .min_by(|a, b| a.1.total_cmp(&b.1))
         .map(|(t, d)| (t.clone(), d))
 }
 
-/// Nearest token to the right of the label on the same line; distance = horizontal gap.
+/// Nearest token to the right of the label on the same line; distance = horizontal gap. Both
+/// boxes are in the frame of the page's tilted text (`frame`).
 fn pick_right(label: &Rect, tokens: &[Token], max_distance: f32) -> Option<(Token, f32)> {
     tokens
         .iter()
-        .filter(|t| t.rect.overlap_y(label) >= 0.5 * t.rect.h.min(label.h))
-        .filter(|t| t.rect.x >= label.right() - 1.0 && t.rect.x - label.right() <= max_distance)
-        .map(|t| (t, (t.rect.x - label.right()).max(0.0)))
+        .filter(|t| t.frame.overlap_y(label) >= 0.5 * t.frame.h.min(label.h))
+        .filter(|t| t.frame.x >= label.right() - 1.0 && t.frame.x - label.right() <= max_distance)
+        .map(|t| (t, (t.frame.x - label.right()).max(0.0)))
         .min_by(|a, b| a.1.total_cmp(&b.1))
         .map(|(t, d)| (t.clone(), d))
 }
@@ -836,6 +860,7 @@ mod tests {
             height: 842.0,
             lines: build_lines(glyphs),
             slanted: Vec::new(),
+            tilt: 0.0,
         }
     }
 

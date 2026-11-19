@@ -111,11 +111,16 @@ fn danfse_nt008_layouts() {
     }
 }
 
-/// Only a watermark is slanted text: the text layer of a scan skewed a few degrees and synthetic
-/// italics (a shear) are read like upright text.
+/// Only a watermark is slanted text: the text layer of a scan skewed a few degrees (either way;
+/// across the page its rows rise or fall more than the gap between them) and synthetic italics (a
+/// shear) are read like upright text, by the built-in profile.
 #[test]
 fn skewed_and_italic_text_is_read() {
-    for name in ["danfse-nt008-skewed.pdf", "danfse-nt008-italic.pdf"] {
+    for name in [
+        "danfse-nt008-skewed.pdf",
+        "danfse-nt008-skewed-cw.pdf",
+        "danfse-nt008-italic.pdf",
+    ] {
         let doc = extract(name);
         assert_eq!(doc.status, Status::Ok, "{name}: {doc:?}");
         assert_eq!(doc.doc_type, "NFS-e", "{name}");

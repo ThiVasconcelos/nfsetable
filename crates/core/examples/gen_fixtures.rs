@@ -819,6 +819,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &turned(danfse_nt008(Nt008::Me2026), 3.0),
         Upright,
     )?;
+    // Skewed the other way: its rows fall to the right.
+    write_pdf(
+        pdfium,
+        &dir.join("danfse-nt008-skewed-cw.pdf"),
+        &turned(danfse_nt008(Nt008::Me2026), -3.0),
+        Upright,
+    )?;
     write_pdf(
         pdfium,
         &dir.join("danfse-nt008-italic.pdf"),

@@ -24,13 +24,16 @@ const BASELINE_TOLERANCE: f32 = 0.35;
 /// lines, whose baseline tolerance their large boxes would stretch until rows of the page merge.
 /// The text layer of a skewed scan (a few degrees) stays in the lines.
 const SLANT_DEGREES: f32 = 20.0;
+/// Tilts below this many degrees are float noise, not a skewed scan: the page is read as upright.
+const MIN_TILT_DEGREES: f32 = 0.05;
 
 /// A visible char with its box in display coordinates.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Glyph {
     pub ch: char,
     pub rect: Rect,
-    /// Baseline y in display coordinates.
+    /// Baseline y in display coordinates; on a tilted page (a skewed scan), its distance across
+    /// the tilted baselines instead, so the glyphs of a row still share it (see `deskew`).
     pub baseline: f32,
 }
 
@@ -62,12 +65,31 @@ pub(crate) struct Line {
 impl Line {
     /// Box of the glyphs behind the byte range `start..end` of `raw`.
     pub fn raw_span_rect(&self, start: usize, end: usize) -> Rect {
-        span_rect(&self.glyphs, &self.raw_owner, start, end)
+        span_rect(&self.glyphs, &self.raw_owner, start, end, 0.0)
     }
 
     /// Box of the glyphs behind the byte range `start..end` of `norm`.
     pub fn norm_span_rect(&self, start: usize, end: usize) -> Rect {
-        span_rect(&self.glyphs, &self.norm_owner, start, end)
+        span_rect(&self.glyphs, &self.norm_owner, start, end, 0.0)
+    }
+
+    /// `raw_span_rect` in the frame of text tilted `tilt` degrees (see `untilted`).
+    pub fn raw_span_untilted(&self, start: usize, end: usize, tilt: f32) -> Rect {
+        span_rect(&self.glyphs, &self.raw_owner, start, end, tilt)
+    }
+
+    /// `norm_span_rect` in the frame of text tilted `tilt` degrees (see `untilted`).
+    pub fn norm_span_untilted(&self, start: usize, end: usize, tilt: f32) -> Rect {
+        span_rect(&self.glyphs, &self.norm_owner, start, end, tilt)
+    }
+
+    /// Box of a segment in the frame of text tilted `tilt` degrees (see `untilted`).
+    pub fn segment_untilted(&self, segment: &Segment, tilt: f32) -> Rect {
+        union_all(
+            self.glyphs[segment.glyphs.clone()]
+                .iter()
+                .map(|g| untilted(&g.rect, tilt)),
+        )
     }
 }
 
@@ -83,6 +105,9 @@ pub(crate) struct PageText {
     /// lines: a run ends at an upright char, where the angle changes or where the next char does
     /// not follow along the baseline (a watermark drawn twice gives two runs).
     pub slanted: Vec<String>,
+    /// Degrees the upright text turns counterclockwise from the page axes: the text layer of a
+    /// skewed scan. 0 for most pages.
+    pub tilt: f32,
 }
 
 impl PageText {
@@ -190,6 +215,8 @@ pub(crate) fn page_text(page: &PdfPage<'_>) -> Result<PageText, PdfiumError> {
     let mut slanted: Vec<String> = Vec::new();
     // The last char of the slanted run being read; `None` after an upright char.
     let mut run_last: Option<RunEnd> = None;
+    // How far each upright char turns from the nearest page axis (degrees).
+    let mut tilts: Vec<f32> = Vec::new();
     for ch in text.chars().iter() {
         let Some(c) = ch.unicode_char() else {
             continue;
@@ -244,18 +271,75 @@ pub(crate) fn page_text(page: &PdfPage<'_>) -> Result<PageText, PdfiumError> {
             Ok((x, y)) => frame.point(x.value, y.value).1,
             Err(_) => rect.y + rect.h,
         };
+        tilts.push((angle + 45.0).rem_euclid(90.0) - 45.0);
         glyphs.push(Glyph {
             ch: c,
             rect,
             baseline,
         });
     }
+    let tilt = deskew(&mut glyphs, &mut tilts);
     Ok(PageText {
         width: page.width().value,
         height: page.height().value,
         lines: build_lines(glyphs),
         slanted,
+        tilt,
     })
+}
+
+/// The text layer of a skewed scan runs a few degrees off the page axes: across the page its rows
+/// rise or fall more than the gap between them, so grouping glyphs by their display y would mix
+/// the rows. The tilt is the median turn of the upright chars (counterclockwise); when there is
+/// one, each glyph's `baseline` becomes its row in the tilted frame (see `untilted`), the same for
+/// every glyph of a row. The boxes stay where they are. Returns the tilt, 0 for an upright page.
+fn deskew(glyphs: &mut [Glyph], tilts: &mut [f32]) -> f32 {
+    if tilts.is_empty() {
+        return 0.0;
+    }
+    tilts.sort_by(f32::total_cmp);
+    let tilt = tilts[tilts.len() / 2];
+    if tilt.abs() < MIN_TILT_DEGREES {
+        return 0.0;
+    }
+    let (sin, cos) = tilt.to_radians().sin_cos();
+    for glyph in glyphs {
+        glyph.baseline = glyph.baseline * cos + glyph.rect.x * sin;
+    }
+    tilt
+}
+
+/// The box `r` (display coordinates, y down) seen in the frame of text tilted `tilt` degrees
+/// counterclockwise, where its rows are horizontal: x·cos − y·sin across, y·cos + x·sin down. The
+/// box of one glyph barely grows; a long run's display box would, so spans are built glyph by
+/// glyph. With no tilt, `r` itself.
+pub(crate) fn untilted(r: &Rect, tilt: f32) -> Rect {
+    if tilt == 0.0 {
+        return *r;
+    }
+    let (sin, cos) = tilt.to_radians().sin_cos();
+    let corners = [
+        (r.x, r.y),
+        (r.right(), r.y),
+        (r.x, r.bottom()),
+        (r.right(), r.bottom()),
+    ];
+    let across = corners.map(|(x, y)| x * cos - y * sin);
+    let down = corners.map(|(x, y)| y * cos + x * sin);
+    let (x1, x2) = (
+        across.iter().copied().fold(f32::INFINITY, f32::min),
+        across.iter().copied().fold(f32::NEG_INFINITY, f32::max),
+    );
+    let (y1, y2) = (
+        down.iter().copied().fold(f32::INFINITY, f32::min),
+        down.iter().copied().fold(f32::NEG_INFINITY, f32::max),
+    );
+    Rect {
+        x: x1,
+        y: y1,
+        w: x2 - x1,
+        h: y2 - y1,
+    }
 }
 
 /// Whether a char at `degrees` is turned away from both page axes by more than `SLANT_DEGREES`.
@@ -386,7 +470,7 @@ fn make_segment(
     }
 }
 
-fn span_rect(glyphs: &[Glyph], owner: &[usize], start: usize, end: usize) -> Rect {
+fn span_rect(glyphs: &[Glyph], owner: &[usize], start: usize, end: usize, tilt: f32) -> Rect {
     if start >= end || end > owner.len() {
         return Rect::default();
     }
@@ -394,7 +478,7 @@ fn span_rect(glyphs: &[Glyph], owner: &[usize], start: usize, end: usize) -> Rec
     union_all(
         glyphs[first.min(last)..=first.max(last)]
             .iter()
-            .map(|g| g.rect),
+            .map(|g| untilted(&g.rect, tilt)),
     )
 }
 
