@@ -1403,7 +1403,7 @@ function mockAppInfo(): AppInfo {
   }
   const dataDir = currentDataDir()
   return {
-    version: '0.3.0',
+    version: '0.3.1',
     pdfiumOk: !missing,
     pdfiumError: missing
       ? 'Não foi possível carregar a biblioteca PDFium. Procurado em: C:/Program Files/nfsetable/pdfium.dll; C:/Program Files/nfsetable/resources/pdfium/pdfium.dll (modo demonstração)'
