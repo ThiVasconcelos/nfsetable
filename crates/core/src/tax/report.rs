@@ -15,7 +15,7 @@ use super::window;
 use super::Input;
 use crate::model::{
     LeftoverReport, MeiReport, MeiStatus, ProLaboreReport, RegimeCost, RevenueSummary,
-    SimplesActivity, SimplesReport, TaxRegime, TaxReport,
+    SimplesActivity, SimplesReport, TaxRate, TaxRegime, TaxReport,
 };
 use crate::text::count_label;
 use rust_decimal::Decimal;
@@ -326,6 +326,14 @@ impl<'a> Estimate<'a> {
                 effective_rate: to_f64(das.effective_rate),
                 das_cents: to_cents(das.total),
                 split: scenarios::tax_shares(&das.split),
+                rates: das
+                    .rates
+                    .iter()
+                    .map(|(tax, rate)| TaxRate {
+                        tax: tax.clone(),
+                        rate: to_f64(*rate),
+                    })
+                    .collect(),
                 pro_labore_for_annex_iii_cents: to_cents(ctx.auto_pro_labore),
                 me_limit_remaining_cents: to_cents(
                     (tables.simples.me_limit - ytd).max(Decimal::ZERO),
@@ -595,6 +603,7 @@ pub(crate) fn zero_report(input: &Input, warnings: Vec<String>) -> TaxReport {
             effective_rate: 0.0,
             das_cents: 0,
             split: Vec::new(),
+            rates: Vec::new(),
             pro_labore_for_annex_iii_cents: 0,
             me_limit_remaining_cents: 0,
             me_limit_cents: 0,

@@ -468,6 +468,12 @@ export interface TaxShare {
   cents: number
 }
 
+/** The rate of one tax (e.g. inside the DAS). */
+export interface TaxRate {
+  tax: string
+  rate: number
+}
+
 export interface SimplesReport {
   /** Payroll of the window / RBT12, truncated to two decimals like the PGDAS-D. */
   fatorR: number
@@ -484,6 +490,11 @@ export interface SimplesReport {
   dasCents: number
   /** DAS split by tax. */
   split: TaxShare[]
+  /**
+   * Effective rate of each tax inside the DAS: from 2027 the CBS and IBS ones go on the NFS-e and
+   * are what a buyer in the regular regime can credit.
+   */
+  rates: TaxRate[]
   /**
    * Monthly pró-labore that brings the Fator R to 28% in the typical month and in every month
    * considered (the automatic amount), never below the minimum wage.

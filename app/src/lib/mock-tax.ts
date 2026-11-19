@@ -13,6 +13,7 @@ import type {
   TaxInput,
   TaxRegime,
   TaxReport,
+  TaxRate,
   TaxShare,
 } from './types'
 
@@ -226,6 +227,7 @@ function simples(annex: 'III' | 'V', rbt12: number, revenue: number, t: Tables) 
   const das = Math.round(revenue * effective)
   const iss = b.split.iss
   let split: TaxShare[]
+  let rates: TaxRate[] = Object.entries(b.split).map(([tax, share]) => ({ tax, rate: effective * share }))
   if (iss != null && effective * iss > ISS_CAP) {
     // The ISS stays at the cap; the rest goes by the excess table or in proportion to the others.
     const capped = Math.round(revenue * ISS_CAP)
@@ -234,9 +236,13 @@ function simples(annex: 'III' | 'V', rbt12: number, revenue: number, t: Tables) 
     const excess = t.issExcess[annex] ?? Object.fromEntries(Object.entries(others).map(([tax, s]) => [tax, s / otherTotal]))
     split = [...splitBy(das - capped, excess), { tax: 'iss', cents: capped }]
     split.sort((a, b) => TAX_ORDER.indexOf(a.tax) - TAX_ORDER.indexOf(b.tax))
+    rates = [
+      ...Object.entries(excess).map(([tax, share]) => ({ tax, rate: (effective - ISS_CAP) * share })),
+      { tax: 'iss', rate: ISS_CAP },
+    ].sort((a, b) => TAX_ORDER.indexOf(a.tax) - TAX_ORDER.indexOf(b.tax))
   } else split = splitBy(das, b.split)
   // The 6th bracket has no ISS inside the DAS: it is paid to the municipality.
-  return { bracket: index + 1, nominal: b.nominal, deduction: b.deduction, effective, das, split, issOutside: iss == null }
+  return { bracket: index + 1, nominal: b.nominal, deduction: b.deduction, effective, das, split, rates, issOutside: iss == null }
 }
 
 function presumido(revenue: number, proLabore: number, issRate: number) {
@@ -694,6 +700,7 @@ export function mockTaxReport(input: TaxInput): TaxReport {
       effectiveRate: s.effective,
       dasCents: s.das,
       split: s.split,
+      rates: s.rates,
       proLaboreForAnnexIiiCents: forAnnexIii,
       meLimitRemainingCents: Math.max(0, ME_LIMIT - yearToDate),
       meLimitCents: ME_LIMIT,

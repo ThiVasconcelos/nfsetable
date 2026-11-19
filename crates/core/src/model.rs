@@ -572,6 +572,14 @@ pub struct TaxShare {
     pub cents: i64,
 }
 
+/// The rate of one tax (e.g. inside the DAS).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaxRate {
+    pub tax: String,
+    pub rate: f64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SimplesReport {
@@ -590,6 +598,9 @@ pub struct SimplesReport {
     pub das_cents: i64,
     /// DAS split by tax.
     pub split: Vec<TaxShare>,
+    /// Effective rate of each tax inside the DAS: from 2027 the CBS and IBS ones go on the NFS-e and
+    /// are what a buyer in the regular regime can credit.
+    pub rates: Vec<TaxRate>,
     /// Monthly pró-labore that brings the Fator R to 28% in the typical month and in every month
     /// considered (the automatic amount), never below the minimum wage.
     pub pro_labore_for_annex_iii_cents: i64,

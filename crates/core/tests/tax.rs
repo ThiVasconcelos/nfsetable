@@ -648,6 +648,18 @@ fn iss_cap_in_annex_iii_bracket_5_in_2027() {
             ("ibs", 7_678)
         ]
     );
+    // Rates with the ISS at the cap: ISS 5%; CBS 11,812% × 23,20% = 2,740384%; IBS 11,812% × 0,26%
+    // = 0,0307112%.
+    let rates: Vec<(&str, f64)> = simples
+        .rates
+        .iter()
+        .map(|r| (r.tax.as_str(), r.rate))
+        .collect();
+    assert_eq!(rates.len(), 6);
+    assert_eq!(rates[4].0, "iss");
+    assert_close(rates[4].1, 0.05);
+    assert_close(rates[2].1, 0.02740384);
+    assert_close(rates[5].1, 0.000307112);
 }
 
 #[test]
@@ -709,6 +721,11 @@ fn simples_tables_of_2027_have_cbs_and_ibs() {
             ("ibs", 277)
         ]
     );
+    // Rates inside the DAS, for the NFS-e and the buyer's credit: CBS 7,30% × 16,91% = 1,23443%;
+    // IBS 7,30% × 0,19% = 0,01387%.
+    let rate = |tax: &str| simples.rates.iter().find(|r| r.tax == tax).unwrap().rate;
+    assert_close(rate("cbs"), 0.0123443);
+    assert_close(rate("ibs"), 0.0001387);
 
     // Anexo V with a pró-labore of one minimum wage: Fator R 0,08, bracket 2, 16,125% → DAS
     // 3.225,00: IRPJ 23% = 741,75; CSLL 15% = 483,75; CBS 16,96% = 546,96; CPP 27,85% =
@@ -1143,6 +1160,11 @@ fn report_json_shape() {
     assert_eq!(
         value["simples"]["split"][0],
         json!({"tax": "irpj", "cents": 1_200})
+    );
+    assert_eq!(value["simples"]["rates"][0]["tax"], "irpj");
+    assert_close(
+        value["simples"]["rates"][0]["rate"].as_f64().unwrap(),
+        0.0024,
     );
     assert_eq!(value["proLabore"]["irrfReductionCents"], 0);
     assert_eq!(value["proLabore"]["basisMonths"], 3);

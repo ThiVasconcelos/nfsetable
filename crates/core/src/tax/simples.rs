@@ -80,6 +80,11 @@ pub(crate) struct Das {
     pub total: Decimal,
     /// Amount of each tax, rounded to the cent, in the canonical order; sums exactly to `total`.
     pub split: Vec<(String, Decimal)>,
+    /// Effective rate of each tax inside the DAS (the effective rate × its share, the ISS at most
+    /// the cap), in the canonical order. From 2027 the CBS and IBS ones are the rates an optante
+    /// states on the NFS-e and what a buyer in the regular regime can credit (Res. CGSN 140/2018,
+    /// art. 58, as amended by Res. CGSN 190/2026).
+    pub rates: Vec<(String, Decimal)>,
     /// The bracket has no ISS inside the DAS (6th): the ISS is paid directly to the municipality.
     pub iss_outside: bool,
     /// The bracket has no IBS inside the DAS either (6th, from 2027); the IBS paid outside is not
@@ -126,6 +131,7 @@ pub(crate) fn das(simples: &Simples, annex: Annex, rbt12: Decimal, revenue: Deci
     let base = rbt12.max(Decimal::ONE);
     let effective_rate = (base * bracket.nominal_rate - bracket.deduction) / base;
     let total = round_money(revenue * effective_rate);
+    let rates = exact_parts(table, bracket, Decimal::ONE, effective_rate);
     let (split, iss_outside) = split(table, bracket, revenue, effective_rate, total);
     Das {
         annex,
@@ -135,6 +141,7 @@ pub(crate) fn das(simples: &Simples, annex: Annex, rbt12: Decimal, revenue: Deci
         effective_rate,
         total,
         split,
+        rates,
         iss_outside,
         ibs_outside: bracket
             .split
@@ -144,13 +151,50 @@ pub(crate) fn das(simples: &Simples, annex: Annex, rbt12: Decimal, revenue: Deci
     }
 }
 
-/// Each tax gets revenue × effective rate × its share (LC 123/2006, art. 18, § 1º-B). The
+/// Each tax gets `base` × effective rate × its share (LC 123/2006, art. 18, § 1º-B), unrounded. The
 /// effective ISS is capped (5%): above the cap, the ISS stays at the cap and the rest of the
 /// effective rate is split by `iss_excess_split`, or, when the annex has none, among the other
 /// taxes in proportion to their shares in the bracket (LC 123/2006, art. 18, § 1º-B, I, included by
-/// LC 227/2026; the published splits follow it). The parts keep the canonical tax order. Each
-/// amount is rounded to the cent and the rounding difference goes to the largest share (by its
-/// exact amount, i.e. the tax with the largest percentage), so the split adds up to the DAS.
+/// LC 227/2026; the published splits follow it). The parts keep the canonical tax order.
+fn exact_parts(
+    table: &AnnexTable,
+    bracket: &SimplesBracket,
+    base: Decimal,
+    effective_rate: Decimal,
+) -> Vec<(String, Decimal)> {
+    let apply = |shares: &[(String, Option<Decimal>)], rate: Decimal| -> Vec<(String, Decimal)> {
+        shares
+            .iter()
+            .filter_map(|(tax, share)| share.map(|share| (tax.clone(), base * rate * share)))
+            .collect()
+    };
+    match iss_share(bracket) {
+        Some(iss) if effective_rate * iss > table.iss_cap => {
+            let excess = effective_rate - table.iss_cap;
+            let mut parts = match &table.iss_excess_split {
+                Some(shares) => apply(shares, excess),
+                None => apply(&without_iss(&bracket.split), excess),
+            };
+            parts.push(("iss".to_string(), base * table.iss_cap));
+            parts.sort_by_key(|(tax, _)| tax_rank(tax));
+            parts
+        }
+        _ => apply(&bracket.split, effective_rate),
+    }
+}
+
+/// Share of the ISS in the bracket; `None` when it is paid outside the DAS (6th bracket).
+fn iss_share(bracket: &SimplesBracket) -> Option<Decimal> {
+    bracket
+        .split
+        .iter()
+        .find(|(tax, _)| tax == "iss")
+        .and_then(|(_, share)| *share)
+}
+
+/// The exact parts of `revenue` (see `exact_parts`), each rounded to the cent, with the rounding
+/// difference on the largest share (by its exact amount, i.e. the tax with the largest
+/// percentage), so the split adds up to the DAS; and whether the ISS is paid outside the DAS.
 fn split(
     table: &AnnexTable,
     bracket: &SimplesBracket,
@@ -158,30 +202,7 @@ fn split(
     effective_rate: Decimal,
     total: Decimal,
 ) -> (Vec<(String, Decimal)>, bool) {
-    let iss_share = bracket
-        .split
-        .iter()
-        .find(|(tax, _)| tax == "iss")
-        .and_then(|(_, share)| *share);
-    let apply = |shares: &[(String, Option<Decimal>)], rate: Decimal| -> Vec<(String, Decimal)> {
-        shares
-            .iter()
-            .filter_map(|(tax, share)| share.map(|share| (tax.clone(), revenue * rate * share)))
-            .collect()
-    };
-    let mut parts = match iss_share {
-        Some(iss) if effective_rate * iss > table.iss_cap => {
-            let excess = effective_rate - table.iss_cap;
-            let mut parts = match &table.iss_excess_split {
-                Some(shares) => apply(shares, excess),
-                None => apply(&without_iss(&bracket.split), excess),
-            };
-            parts.push(("iss".to_string(), revenue * table.iss_cap));
-            parts.sort_by_key(|(tax, _)| tax_rank(tax));
-            parts
-        }
-        _ => apply(&bracket.split, effective_rate),
-    };
+    let mut parts = exact_parts(table, bracket, revenue, effective_rate);
     let mut largest = 0;
     for (i, part) in parts.iter().enumerate() {
         if part.1 > parts[largest].1 {
@@ -195,7 +216,7 @@ fn split(
     if let Some(part) = parts.get_mut(largest) {
         part.1 += remainder;
     }
-    (parts, iss_share.is_none())
+    (parts, iss_share(bracket).is_none())
 }
 
 /// The shares of the taxes other than the ISS, scaled to add up to 100%.

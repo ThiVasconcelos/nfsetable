@@ -248,9 +248,12 @@ export function formatDateTime(date: Date): string {
 
 const percent2 = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-/** 0.0612 -> "6,12%" (always two decimals). */
-export function formatPercent(rate: number): string {
-  return `${percent2.format(Number.isFinite(rate) ? rate * 100 : 0)}%`
+/** 0.0612 -> "6,12%" (always two decimals; `digits` more for small rates such as 0,0139%). */
+export function formatPercent(rate: number, digits = 2): string {
+  const value = Number.isFinite(rate) ? rate * 100 : 0
+  const format =
+    digits === 2 ? percent2 : new Intl.NumberFormat('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits })
+  return `${format.format(value)}%`
 }
 
 /** 0.05 -> "5" / 0.025 -> "2,5": a rate as the user types it (no % sign, up to 2 decimals). */
