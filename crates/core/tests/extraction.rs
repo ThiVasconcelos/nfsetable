@@ -89,6 +89,14 @@ fn danfse_nt008_layouts() {
             "2027-03-10",
             620.5,
         ),
+        // A cancelled note: the 60 pt diagonal watermark crosses the tax blocks and the totals.
+        (
+            "danfse-nt008-watermark.pdf",
+            127_400,
+            130_000,
+            "2026-04-10",
+            620.5,
+        ),
     ];
     for (name, net, service, date, y) in cases {
         let doc = extract(name);

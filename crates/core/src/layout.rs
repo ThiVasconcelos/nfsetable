@@ -19,6 +19,10 @@ const WORD_GAP: f32 = 0.15;
 const SEGMENT_GAP: f32 = 1.2;
 /// Glyphs whose baselines differ by less than this fraction of the font height share a line.
 const BASELINE_TOLERANCE: f32 = 0.35;
+/// Chars turned more than this many degrees away from the page axes are slanted text (the
+/// CANCELADA / SUBSTITUÍDA watermark of a DANFSe, 45° by NT 008): they are kept out of the lines,
+/// whose baseline tolerance their large boxes would stretch until rows of the page merge.
+const SLANT_DEGREES: f32 = 2.0;
 
 /// A visible char with its box in display coordinates.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -74,6 +78,8 @@ pub(crate) struct PageText {
     pub height: f32,
     /// Sorted top to bottom, then left to right.
     pub lines: Vec<Line>,
+    /// Letters and digits drawn slanted (e.g. a watermark), in content order, out of the lines.
+    pub slanted: String,
 }
 
 impl PageText {
@@ -171,6 +177,7 @@ pub(crate) fn page_text(page: &PdfPage<'_>) -> Result<PageText, PdfiumError> {
     let frame = Frame::of(page);
     let text = page.text()?;
     let mut glyphs = Vec::new();
+    let mut slanted = String::new();
     for ch in text.chars().iter() {
         let Some(c) = ch.unicode_char() else {
             continue;
@@ -178,6 +185,14 @@ pub(crate) fn page_text(page: &PdfPage<'_>) -> Result<PageText, PdfiumError> {
         // Spaces and line breaks are rebuilt from the geometry; PDFium's generated chars have no
         // meaningful box.
         if c.is_whitespace() || c.is_control() || ch.is_generated().unwrap_or(false) {
+            continue;
+        }
+        // The angle is in page space, so text turned with the page (/Rotate) stays a multiple of
+        // 90° and is kept.
+        if ch.angle_degrees().is_ok_and(is_slanted) {
+            if c.is_alphanumeric() {
+                slanted.push(c);
+            }
             continue;
         }
         let Ok(bounds) = ch.loose_bounds() else {
@@ -201,7 +216,14 @@ pub(crate) fn page_text(page: &PdfPage<'_>) -> Result<PageText, PdfiumError> {
         width: page.width().value,
         height: page.height().value,
         lines: build_lines(glyphs),
+        slanted,
     })
+}
+
+/// Whether a char at `degrees` is turned away from both page axes by more than `SLANT_DEGREES`.
+fn is_slanted(degrees: f32) -> bool {
+    let off_axis = degrees.rem_euclid(90.0);
+    off_axis > SLANT_DEGREES && off_axis < 90.0 - SLANT_DEGREES
 }
 
 /// Groups glyphs into lines by baseline and builds segments and texts.
@@ -449,6 +471,16 @@ mod tests {
         let start = line.norm.find("valor").unwrap();
         let rect = line.norm_span_rect(start, line.norm.len());
         assert!((rect.x - 156.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn slanted_chars_are_the_ones_off_the_page_axes() {
+        for upright in [0.0, 1.5, 90.0, 180.0, 270.0, 358.5, -90.0] {
+            assert!(!is_slanted(upright), "{upright}");
+        }
+        for slanted in [2.5, 45.0, 135.0, 315.0, 87.5, -45.0] {
+            assert!(is_slanted(slanted), "{slanted}");
+        }
     }
 
     #[test]

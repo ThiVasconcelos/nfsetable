@@ -12,13 +12,15 @@ use std::path::{Path, PathBuf};
 
 const PAGE_HEIGHT: f32 = 842.0;
 
-/// A text drawn at `x` with its top at `top` (points, top-left origin).
+/// A text drawn at `x` with its top at `top` (points, top-left origin), turned `angle` degrees
+/// counter-clockwise around the start of its baseline.
 struct Text {
     text: &'static str,
     x: f32,
     top: f32,
     size: f32,
     bold: bool,
+    angle: f32,
 }
 
 const fn t(text: &'static str, x: f32, top: f32, size: f32) -> Text {
@@ -28,6 +30,7 @@ const fn t(text: &'static str, x: f32, top: f32, size: f32) -> Text {
         top,
         size,
         bold: false,
+        angle: 0.0,
     }
 }
 
@@ -38,6 +41,20 @@ const fn b(text: &'static str, x: f32, top: f32, size: f32) -> Text {
         top,
         size,
         bold: true,
+        angle: 0.0,
+    }
+}
+
+/// The watermark of a cancelled or substituted DANFSe (NT 008, §§ 2.5.1 and 2.5.2): 60 pt at 45°,
+/// across the middle of the page, as the Receita Federal's generator draws it (as text).
+fn watermark(text: &'static str) -> Text {
+    Text {
+        text,
+        x: 165.0,
+        top: 560.0,
+        size: 60.0,
+        bold: false,
+        angle: 45.0,
     }
 }
 
@@ -162,6 +179,7 @@ fn nt(text: &'static str, x: f32, top_cm: f32, size: f32, bold: bool) -> Text {
         top: top_cm * CM + 0.108 * size,
         size,
         bold,
+        angle: 0.0,
     }
 }
 
@@ -652,6 +670,17 @@ fn write_pdf(
                 )?;
                 let baseline = text.top + 0.8 * text.size;
                 object.transform(0.0, 1.0, -1.0, 0.0, baseline, text.x)?;
+            } else if text.angle != 0.0 {
+                let mut object = page.objects_mut().create_text_object(
+                    PdfPoints::ZERO,
+                    PdfPoints::ZERO,
+                    text.text,
+                    font,
+                    PdfPoints::new(text.size),
+                )?;
+                let (sin, cos) = text.angle.to_radians().sin_cos();
+                let baseline = PAGE_HEIGHT - text.top - 0.8 * text.size;
+                object.transform(cos, sin, -sin, cos, text.x, baseline)?;
             } else {
                 // PDFium places text by its baseline, measured from the bottom of the page.
                 let baseline = PAGE_HEIGHT - text.top - 0.8 * text.size;
@@ -709,6 +738,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         pdfium,
         &dir.join("danfse-nt008-2027.pdf"),
         &danfse_nt008(Nt008::Me2027),
+        Upright,
+    )?;
+    let mut cancelled = danfse_nt008(Nt008::Me2026);
+    cancelled.push(watermark("CANCELADA"));
+    write_pdf(
+        pdfium,
+        &dir.join("danfse-nt008-watermark.pdf"),
+        &cancelled,
         Upright,
     )?;
     write_pdf(

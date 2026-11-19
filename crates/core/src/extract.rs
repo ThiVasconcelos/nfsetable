@@ -762,6 +762,7 @@ mod tests {
             width: 595.0,
             height: 842.0,
             lines: build_lines(glyphs),
+            slanted: String::new(),
         }
     }
 
