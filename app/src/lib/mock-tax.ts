@@ -738,6 +738,9 @@ export function mockTaxReport(input: TaxInput): TaxReport {
     warnings.push(
       `Tabelas de ${refTables.from.slice(0, 4)}: salário mínimo de ${formatBRLPlain(refTables.minWage)} e teto do INSS de ${formatBRLPlain(refTables.inssCeiling)}.`,
     )
+  // Like the engine: a target set but out of reach is said, not left as an unset one.
+  if (desired != null && required == null)
+    warnings.push('Não foi possível calcular o faturamento necessário para o valor desejado.')
 
   return {
     referenceMonth: ref,
