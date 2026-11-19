@@ -144,7 +144,8 @@ const WATERMARK_TYPES: [(&str, &str); 2] =
 fn watermark_type<'a>(pages: impl IntoIterator<Item = &'a PageText>) -> Option<&'static str> {
     let slanted: String = pages
         .into_iter()
-        .map(|page| page.slanted.as_str())
+        .flat_map(|page| page.slanted.iter())
+        .map(String::as_str)
         .collect();
     let slanted = compact(&slanted);
     WATERMARK_TYPES
@@ -796,7 +797,7 @@ mod tests {
             width: 595.0,
             height: 842.0,
             lines: build_lines(glyphs),
-            slanted: String::new(),
+            slanted: Vec::new(),
         }
     }
 

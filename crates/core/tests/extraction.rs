@@ -111,6 +111,21 @@ fn danfse_nt008_layouts() {
     }
 }
 
+/// Only a watermark is slanted text: the text layer of a scan skewed a few degrees and synthetic
+/// italics (a shear) are read like upright text.
+#[test]
+fn skewed_and_italic_text_is_read() {
+    for name in ["danfse-nt008-skewed.pdf", "danfse-nt008-italic.pdf"] {
+        let doc = extract(name);
+        assert_eq!(doc.status, Status::Ok, "{name}: {doc:?}");
+        assert_eq!(doc.doc_type, "NFS-e", "{name}");
+        assert_eq!(origin(&doc), Some(&danfse_origin()), "{name}");
+        assert_eq!(cents(&doc), Some(127_400), "{name}");
+        assert_eq!(service_cents(&doc), Some(130_000), "{name}");
+        assert_eq!(competence(&doc), Some("2026-04-10"), "{name}");
+    }
+}
+
 /// A cancelled or substituted DANFSe is told by its watermark, whatever its file name.
 #[test]
 fn watermarks_classify_the_danfse() {

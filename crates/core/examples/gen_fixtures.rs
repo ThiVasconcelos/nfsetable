@@ -13,7 +13,8 @@ use std::path::{Path, PathBuf};
 const PAGE_HEIGHT: f32 = 842.0;
 
 /// A text drawn at `x` with its top at `top` (points, top-left origin), turned `angle` degrees
-/// counter-clockwise around the start of its baseline.
+/// counter-clockwise around the start of its baseline, or sheared by `shear` (synthetic italic;
+/// one of the two, not both).
 struct Text {
     text: &'static str,
     x: f32,
@@ -21,6 +22,7 @@ struct Text {
     size: f32,
     bold: bool,
     angle: f32,
+    shear: f32,
 }
 
 const fn t(text: &'static str, x: f32, top: f32, size: f32) -> Text {
@@ -31,6 +33,7 @@ const fn t(text: &'static str, x: f32, top: f32, size: f32) -> Text {
         size,
         bold: false,
         angle: 0.0,
+        shear: 0.0,
     }
 }
 
@@ -42,6 +45,7 @@ const fn b(text: &'static str, x: f32, top: f32, size: f32) -> Text {
         size,
         bold: true,
         angle: 0.0,
+        shear: 0.0,
     }
 }
 
@@ -55,7 +59,40 @@ fn watermark(text: &'static str) -> Text {
         size: 60.0,
         bold: false,
         angle: 45.0,
+        shear: 0.0,
     }
+}
+
+/// The page turned `degrees` around its centre, as the text layer of a skewed scan.
+fn turned(texts: Vec<Text>, degrees: f32) -> Vec<Text> {
+    let (sin, cos) = degrees.to_radians().sin_cos();
+    let (cx, cy) = (297.5, 421.0);
+    texts
+        .into_iter()
+        .map(|text| {
+            // Turn the start of the baseline (page space, y up) around the centre.
+            let baseline = PAGE_HEIGHT - text.top - 0.8 * text.size;
+            let (dx, dy) = (text.x - cx, baseline - cy);
+            let (x, y) = (cx + dx * cos - dy * sin, cy + dx * sin + dy * cos);
+            Text {
+                x,
+                top: PAGE_HEIGHT - y - 0.8 * text.size,
+                angle: text.angle + degrees,
+                ..text
+            }
+        })
+        .collect()
+}
+
+/// Every text sheared like a synthetic italic (iText and JasperReports use 0,21256, about 12°).
+fn sheared(texts: Vec<Text>) -> Vec<Text> {
+    texts
+        .into_iter()
+        .map(|text| Text {
+            shear: 0.21256,
+            ..text
+        })
+        .collect()
 }
 
 fn danfse_v1(net_value: &'static str) -> Vec<Text> {
@@ -180,6 +217,7 @@ fn nt(text: &'static str, x: f32, top_cm: f32, size: f32, bold: bool) -> Text {
         size,
         bold,
         angle: 0.0,
+        shear: 0.0,
     }
 }
 
@@ -670,7 +708,7 @@ fn write_pdf(
                 )?;
                 let baseline = text.top + 0.8 * text.size;
                 object.transform(0.0, 1.0, -1.0, 0.0, baseline, text.x)?;
-            } else if text.angle != 0.0 {
+            } else if text.angle != 0.0 || text.shear != 0.0 {
                 let mut object = page.objects_mut().create_text_object(
                     PdfPoints::ZERO,
                     PdfPoints::ZERO,
@@ -680,7 +718,7 @@ fn write_pdf(
                 )?;
                 let (sin, cos) = text.angle.to_radians().sin_cos();
                 let baseline = PAGE_HEIGHT - text.top - 0.8 * text.size;
-                object.transform(cos, sin, -sin, cos, text.x, baseline)?;
+                object.transform(cos, sin, text.shear - sin, cos, text.x, baseline)?;
             } else {
                 // PDFium places text by its baseline, measured from the bottom of the page.
                 let baseline = PAGE_HEIGHT - text.top - 0.8 * text.size;
@@ -754,6 +792,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         pdfium,
         &dir.join("danfse-nt008-watermark-sub.pdf"),
         &substituted,
+        Upright,
+    )?;
+    // Not watermarks: the text layer of a scan skewed 3°, and a page in synthetic italics.
+    write_pdf(
+        pdfium,
+        &dir.join("danfse-nt008-skewed.pdf"),
+        &turned(danfse_nt008(Nt008::Me2026), 3.0),
+        Upright,
+    )?;
+    write_pdf(
+        pdfium,
+        &dir.join("danfse-nt008-italic.pdf"),
+        &sheared(danfse_nt008(Nt008::Me2026)),
         Upright,
     )?;
     write_pdf(

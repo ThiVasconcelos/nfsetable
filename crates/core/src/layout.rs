@@ -19,10 +19,11 @@ const WORD_GAP: f32 = 0.15;
 const SEGMENT_GAP: f32 = 1.2;
 /// Glyphs whose baselines differ by less than this fraction of the font height share a line.
 const BASELINE_TOLERANCE: f32 = 0.35;
-/// Chars turned more than this many degrees away from the page axes are slanted text (the
-/// CANCELADA / SUBSTITUÍDA watermark of a DANFSe, 45° by NT 008): they are kept out of the lines,
-/// whose baseline tolerance their large boxes would stretch until rows of the page merge.
-const SLANT_DEGREES: f32 = 2.0;
+/// Chars whose baseline turns more than this many degrees away from the page axes are slanted text
+/// (the CANCELADA / SUBSTITUÍDA watermark of a DANFSe, 45° by NT 008): they are kept out of the
+/// lines, whose baseline tolerance their large boxes would stretch until rows of the page merge.
+/// The text layer of a skewed scan (a few degrees) stays in the lines.
+const SLANT_DEGREES: f32 = 20.0;
 
 /// A visible char with its box in display coordinates.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -78,8 +79,9 @@ pub(crate) struct PageText {
     pub height: f32,
     /// Sorted top to bottom, then left to right.
     pub lines: Vec<Line>,
-    /// Letters and digits drawn slanted (e.g. a watermark), in content order, out of the lines.
-    pub slanted: String,
+    /// Runs of letters and digits drawn slanted (e.g. a watermark), in content order, out of the
+    /// lines: a run ends at an upright char or where the angle changes.
+    pub slanted: Vec<String>,
 }
 
 impl PageText {
@@ -177,7 +179,9 @@ pub(crate) fn page_text(page: &PdfPage<'_>) -> Result<PageText, PdfiumError> {
     let frame = Frame::of(page);
     let text = page.text()?;
     let mut glyphs = Vec::new();
-    let mut slanted = String::new();
+    let mut slanted: Vec<String> = Vec::new();
+    // Angle of the slanted run being read; `None` after an upright char.
+    let mut run_angle: Option<f32> = None;
     for ch in text.chars().iter() {
         let Some(c) = ch.unicode_char() else {
             continue;
@@ -187,14 +191,22 @@ pub(crate) fn page_text(page: &PdfPage<'_>) -> Result<PageText, PdfiumError> {
         if c.is_whitespace() || c.is_control() || ch.is_generated().unwrap_or(false) {
             continue;
         }
-        // The angle is in page space, so text turned with the page (/Rotate) stays a multiple of
-        // 90° and is kept.
-        if ch.angle_degrees().is_ok_and(is_slanted) {
+        // The direction of the baseline (atan2(b, a) of the char's matrix, 0 when PDFium has none)
+        // is in page space, so text turned with the page (/Rotate) stays a multiple of 90° and is
+        // kept; a shear (synthetic italic) does not turn it. PDFium's char angle would count the
+        // shear too.
+        let angle = ch.get_rotation_counter_clockwise_degrees();
+        if is_slanted(angle) {
             if c.is_alphanumeric() {
-                slanted.push(c);
+                match (run_angle, slanted.last_mut()) {
+                    (Some(run), Some(text)) if (run - angle).abs() <= 1.0 => text.push(c),
+                    _ => slanted.push(c.to_string()),
+                }
+                run_angle = Some(angle);
             }
             continue;
         }
+        run_angle = None;
         let Ok(bounds) = ch.loose_bounds() else {
             continue;
         };
@@ -475,10 +487,13 @@ mod tests {
 
     #[test]
     fn slanted_chars_are_the_ones_off_the_page_axes() {
-        for upright in [0.0, 1.5, 90.0, 180.0, 270.0, 358.5, -90.0] {
+        // Scan skew and the axes (with or without /Rotate) are upright; a watermark is not.
+        for upright in [
+            0.0, 1.5, 3.0, 12.0, 90.0, 180.0, 270.0, 357.0, -90.0, -3.0, 87.5,
+        ] {
             assert!(!is_slanted(upright), "{upright}");
         }
-        for slanted in [2.5, 45.0, 135.0, 315.0, 87.5, -45.0] {
+        for slanted in [30.0, 45.0, 60.0, 135.0, 315.0, -45.0] {
             assert!(is_slanted(slanted), "{slanted}");
         }
     }
