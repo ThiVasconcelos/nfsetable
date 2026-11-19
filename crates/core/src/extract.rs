@@ -140,18 +140,30 @@ fn load(engine: &Engine, path: &Path, which: Pages) -> Result<LoadedDoc, CoreErr
 const WATERMARK_TYPES: [(&str, &str); 2] =
     [("cancelada", "Cancelada"), ("substituida", "Substituída")];
 
-/// The type a watermark gives the document: its slanted text says CANCELADA or SUBSTITUÍDA.
+/// The type a watermark gives the document: a slanted run that reads exactly CANCELADA or
+/// SUBSTITUÍDA, not slanted text that only mentions them (e.g. "substitui a nota cancelada").
 fn watermark_type<'a>(pages: impl IntoIterator<Item = &'a PageText>) -> Option<&'static str> {
-    let slanted: String = pages
+    pages
         .into_iter()
         .flat_map(|page| page.slanted.iter())
-        .map(String::as_str)
-        .collect();
-    let slanted = compact(&slanted);
-    WATERMARK_TYPES
-        .iter()
-        .find(|(text, _)| slanted.contains(text))
-        .map(|(_, doc_type)| *doc_type)
+        .find_map(|run| {
+            let run = compact(run);
+            WATERMARK_TYPES
+                .iter()
+                .find(|(text, _)| run == *text)
+                .map(|(_, doc_type)| *doc_type)
+        })
+}
+
+/// The watermark of the pages the required values were read from, or of every page when none was:
+/// a file that holds a valid note and the one it replaced keeps the type of the note it is read as.
+fn watermark_of(pages: &[(u32, PageText)], value_pages: &[u32]) -> Option<&'static str> {
+    watermark_type(
+        pages
+            .iter()
+            .filter(|(index, _)| value_pages.is_empty() || value_pages.contains(index))
+            .map(|(_, page)| page),
+    )
 }
 
 /// See [`Engine::extract`].
@@ -201,13 +213,11 @@ pub(crate) fn extract_document(
     if let Some(kind) = classifiers().find_map(|p| p.kind) {
         result.kind = kind;
     }
-    // The watermark of a cancelled or substituted DANFSe wins over every profile: such a note is
-    // neither revenue nor expense. A type the user edits in the table still wins over it.
-    if let Some(doc_type) = watermark_type(doc.pages.iter().map(|(_, page)| page)) {
-        result.doc_type = doc_type.to_string();
-    }
 
     if !doc.pages.iter().any(|(_, page)| page.has_text()) {
+        if let Some(doc_type) = watermark_of(&doc.pages, &[]) {
+            result.doc_type = doc_type.to_string();
+        }
         result.status = Status::NoText;
         result.message = Some(MSG_NO_TEXT.to_string());
         return result;
@@ -236,6 +246,17 @@ pub(crate) fn extract_document(
         if let Some(value) = found {
             result.fields.insert(field.id.clone(), value);
         }
+    }
+    // The watermark of a cancelled or substituted DANFSe wins over every profile: such a note is
+    // neither revenue nor expense. A type the user edits in the table still wins over it.
+    let value_pages: Vec<u32> = fields
+        .iter()
+        .filter(|f| f.required)
+        .filter_map(|f| result.fields.get(&f.id))
+        .map(|value| value.page)
+        .collect();
+    if let Some(doc_type) = watermark_of(&doc.pages, &value_pages) {
+        result.doc_type = doc_type.to_string();
     }
 
     // Only required fields decide the status; optional ones are a bonus.
@@ -808,6 +829,37 @@ mod tests {
             direction,
             max_distance,
         }
+    }
+
+    #[test]
+    fn only_a_whole_watermark_run_types_the_document() {
+        let page = |runs: &[&str]| PageText {
+            slanted: runs.iter().map(|run| run.to_string()).collect(),
+            ..PageText::default()
+        };
+        assert_eq!(watermark_type([&page(&["CANCELADA"])]), Some("Cancelada"));
+        assert_eq!(
+            watermark_type([&page(&["SUBSTITUÍDA"])]),
+            Some("Substituída")
+        );
+        assert_eq!(
+            watermark_type([&page(&["ORIGINAL"]), &page(&["Cancelada"])]),
+            Some("Cancelada")
+        );
+        // Slanted text that only mentions the words, and the note that replaces another.
+        for runs in [
+            &["Substituianotacanceladan12"][..],
+            &["SUBSTITUTA"],
+            &["CANCELADAS"],
+            &[],
+        ] {
+            assert_eq!(watermark_type([&page(runs)]), None, "{runs:?}");
+        }
+        // Only the pages the values come from count: a valid note followed by the one it replaced.
+        let pages = [(0, page(&[])), (1, page(&["SUBSTITUÍDA"]))];
+        assert_eq!(watermark_of(&pages, &[0]), None);
+        assert_eq!(watermark_of(&pages, &[1]), Some("Substituída"));
+        assert_eq!(watermark_of(&pages, &[]), Some("Substituída"));
     }
 
     #[test]
