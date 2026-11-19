@@ -385,15 +385,16 @@ fn apply_anchor(
 ) -> Option<Token> {
     let tokens = tokens(page, kind);
     nearest_to_label(page, pattern, exclude, |line, label, end| match direction {
-        // An empty field of a DANFSe shows '-' (NT SE/CGNFS-e 008): nothing under this label, and
-        // nothing further down either (that would be the next row's value).
-        crate::model::Direction::Below => pick_below(label, &tokens, max_distance)
-            .filter(|(token, _)| !(kind == FieldKind::Text && is_dash(&token.raw))),
+        crate::model::Direction::Below => pick_below(label, &tokens, max_distance),
         crate::model::Direction::Right if kind == FieldKind::Text => {
             text_after(line, end, label, max_distance)
         }
         crate::model::Direction::Right => pick_right(label, &tokens, max_distance),
     })
+    // An empty field of a DANFSe shows '-' (NT SE/CGNFS-e 008). When the nearest cell is a dash the
+    // field is empty: not the next row's value, nor the cell of another occurrence of the label
+    // (NT 008 repeats Telefone, E-mail and others for each party).
+    .filter(|token| !(kind == FieldKind::Text && is_dash(&token.raw)))
 }
 
 /// The nearest value over every occurrence of the label on the page: `pick` turns one occurrence
@@ -889,6 +890,14 @@ mod tests {
             ("Outro campo", 10.0, 118.0),
         ];
         assert_eq!(read(&filled).as_deref(), Some("ME/EPP"));
+        // The label repeats further down (another party): the first, empty one still wins.
+        let repeated = [
+            ("Situacao", 10.0, 100.0),
+            ("-", 10.0, 107.0),
+            ("Situacao", 10.0, 200.0),
+            ("ME/EPP", 10.0, 207.0),
+        ];
+        assert_eq!(read(&repeated), None);
         for dash in ["-", "–", "—", "--"] {
             assert!(is_dash(dash), "{dash}");
         }
