@@ -99,7 +99,8 @@
       {#if noteRates.length}
         <p class="note-rates" title="Alíquotas contidas no DAS: vão na NFS-e e são o crédito de um cliente do regime regular">
           Na NFS-e:
-          {#each noteRates as r, i (r.tax)}{#if i > 0}<span aria-hidden="true"> · </span>{/if}<span
+          <!-- Svelte trims the ends of an element's text: the spaces around the dot stay outside. -->
+          {#each noteRates as r, i (r.tax)}{#if i > 0}{' '}<span aria-hidden="true">·</span>{' '}{/if}<span class="part"
               >{taxName(r.tax)} <span class="num">{formatPercent(r.rate, 4)}</span></span
             >{/each}
         </p>
@@ -206,5 +207,10 @@
     margin: 6px 0 0;
     font-size: 12px;
     color: var(--text-3);
+  }
+
+  /* The line wraps between rates, never inside one. */
+  .part {
+    white-space: nowrap;
   }
 </style>
