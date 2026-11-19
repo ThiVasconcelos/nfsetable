@@ -555,7 +555,7 @@ export function mockTaxReport(input: TaxInput): TaxReport {
   const customRevenue = input.leftoverRevenueCents != null
   const leftoverRevenue = customRevenue ? Math.max(0, input.leftoverRevenueCents!) : average
   const current = customRevenue
-    ? scenario(input.regime, leftoverRevenue, rbt12, { ...ctx, fixedProLabore: real.proLabore || null })
+    ? scenario(input.regime, leftoverRevenue, rbt12, { ...ctx, fixedProLabore: real.proLabore })
     : real
   const leftover = {
     revenueCents: leftoverRevenue,
