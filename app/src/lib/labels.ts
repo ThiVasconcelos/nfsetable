@@ -223,8 +223,8 @@ const TAX_HINTS: Record<string, string> = {
   pis: 'Programa de Integração Social',
   cpp: 'Contribuição Patronal Previdenciária (o INSS da empresa)',
   iss: 'Imposto Sobre Serviços (municipal)',
-  cbs: 'Contribuição sobre Bens e Serviços (federal; no lugar do PIS e da Cofins a partir de 2027)',
-  ibs: 'Imposto sobre Bens e Serviços (estadual e municipal; substitui o ICMS e o ISS até 2033)',
+  cbs: 'Contribuição Social sobre Bens e Serviços (federal; no lugar do PIS e da Cofins a partir de 2027)',
+  ibs: 'Imposto sobre Bens e Serviços (estadual e municipal; substitui aos poucos o ICMS e o ISS, extintos em 2033)',
   inss: 'Contribuição do titular para a Previdência (no MEI, 5% do salário mínimo)',
 }
 
