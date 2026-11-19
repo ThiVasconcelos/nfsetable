@@ -64,7 +64,7 @@
   }
 
   const hint = $derived(
-    (row.cancelled ? 'Nota cancelada: fica fora do total. ' : '') +
+    (row.cancelled ? 'Nota cancelada ou substituída: fica fora do total. ' : '') +
       (row.valueEdited
         ? row.origin?.type === 'region'
           ? 'Valor aplicado a partir de uma região marcada. Duplo clique para editar.'

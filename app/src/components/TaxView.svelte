@@ -280,7 +280,7 @@
             {:else if !tax.monthKeys.length}
               <span class="empty-icon"><Icon name="fileText" size={22} /></span>
               <h2>Nenhuma nota com valor para somar</h2>
-              <p>Os impostos usam as notas que entram no total (sem duplicadas nem canceladas) e o previsto.</p>
+              <p>Os impostos usam as notas que entram no total (sem duplicadas, canceladas nem substituídas) e o previsto.</p>
               <div class="empty-actions">
                 <button type="button" class="btn btn-primary" onclick={startProjection}>Adicionar projeção</button>
                 <button type="button" class="btn" onclick={() => store.setView('notes')}>Ir para Notas</button>

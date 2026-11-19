@@ -228,7 +228,7 @@ const CHUNK_SIZE = 8
 const PUBLISH_MS = 200
 const DEFAULT_EXCLUDE = ['cancelada']
 /** Types offered by the type editor. "Bônus" notes count as revenue like any other. */
-export const BASE_TYPES = ['NFS-e', 'PDF', 'Cancelada', 'Bônus']
+export const BASE_TYPES = ['NFS-e', 'PDF', 'Cancelada', 'Substituída', 'Bônus']
 const SORT_KEYS: SortKey[] = ['file', 'type', 'kind', 'competence', 'value', 'status', 'origin']
 /** Keys of the first versions, kept in localStorage; migrated once into the "notes" document. */
 const LEGACY_NOTE_KEYS = ['sources', 'exclude', 'overrides', 'hiddenCopies', 'includeDuplicates']
@@ -361,14 +361,18 @@ function legacyNotes(): NotesDoc | null {
   }
 }
 
-/** "Cancelada" (any case/accents) marks a cancelled note, which never counts towards the total. */
+/**
+ * "Cancelada" or "Substituída" (any case/accents) marks a note that no longer counts: cancelled, or
+ * replaced by another one (cancelled by the substitution event), so never towards the total.
+ */
 const cancelledTypes = new Map<string, boolean>()
 
-/** Typed as a cancelled note (remembered: the table asks for every row on every rebuild). */
+/** Typed as a cancelled or substituted note (remembered: the table asks for every row on every rebuild). */
 export function isCancelledType(type: string): boolean {
   let cancelled = cancelledTypes.get(type)
   if (cancelled === undefined) {
-    cancelled = normalizeText(type).startsWith('cancelad')
+    const key = normalizeText(type)
+    cancelled = key.startsWith('cancelad') || key.startsWith('substituid')
     cancelledTypes.set(type, cancelled)
   }
   return cancelled
@@ -382,6 +386,8 @@ export function isBonusType(type: string): boolean {
 /** `nameKey`: the normalized file name. */
 function defaultTypeFor(nameKey: string, result: DocResult | null): string {
   if (nameKey.includes('cancelad')) return 'Cancelada'
+  // Not "substitu": the note that replaces another ("substituta", "substituição") is revenue.
+  if (nameKey.includes('substituid')) return 'Substituída'
   return result?.docType ?? ''
 }
 

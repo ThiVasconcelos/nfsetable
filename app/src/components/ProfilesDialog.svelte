@@ -106,7 +106,7 @@
   })
   const typeSuggestions = $derived.by(() => {
     const q = normalizeText(docType)
-    const all = [...new Set([...EXPENSE_TYPES, ...store.knownTypes])].filter((t) => !['cancelada'].includes(normalizeText(t)))
+    const all = [...new Set([...EXPENSE_TYPES, ...store.knownTypes])].filter((t) => !['cancelada', 'substituida'].includes(normalizeText(t)))
     return all.filter((t) => normalizeText(t) !== q && (!q || normalizeText(t).includes(q))).slice(0, 8)
   })
 

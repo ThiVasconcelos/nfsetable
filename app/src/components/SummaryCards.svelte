@@ -10,7 +10,7 @@
   const outside = $derived(
     [
       t.duplicates && !store.includeDuplicates ? plural(t.duplicates, 'duplicada', 'duplicadas') : '',
-      t.cancelled ? plural(t.cancelled, 'cancelada', 'canceladas') : '',
+      t.cancelled ? plural(t.cancelled, 'cancelada ou substituída', 'canceladas ou substituídas') : '',
     ].filter(Boolean),
   )
   const outsideCount = $derived(t.cancelled + (store.includeDuplicates ? 0 : t.duplicates))

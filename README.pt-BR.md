@@ -34,7 +34,8 @@ Aponte a pasta das notas, confira os valores e veja o total da seleção. Tudo r
   - outros layouts, procurando rótulos como "Valor Líquido", "Valor dos Serviços" e "Data de emissão".
 - Tabela com arquivo, tipo, competência, valor, status e origem: ordena por qualquer coluna,
   seleciona intervalos com Shift, mostra total geral, total da seleção e totais por tipo.
-  Duplicadas e notas do tipo "Cancelada" aparecem, mas ficam fora do total.
+  Duplicadas e notas do tipo "Cancelada" ou "Substituída" aparecem, mas ficam fora do total; a
+  DANFSe com a marca d'água CANCELADA ou SUBSTITUÍDA já recebe esse tipo sozinha.
 - **Período** pela competência (este mês, este ano, de MM/AAAA até MM/AAAA…), que vale para os
   cards, a tabela, os totais e a exportação.
 - Prévia do PDF com o valor destacado, para você conferir de onde ele saiu.

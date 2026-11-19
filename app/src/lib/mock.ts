@@ -530,6 +530,9 @@ function scannedPage(): Built {
 
 // ---------------------------------------------------------------- documents
 
+/** Types the engine gives: the built-in profile, none, or a watermark (cancelled notes go by file name). */
+type MockDocType = 'NFS-e' | 'PDF' | 'Substituída'
+
 interface MockDoc {
   path: string
   name: string
@@ -538,7 +541,7 @@ interface MockDoc {
   contentId: string
   /** null = corrupt file. */
   pages: MockPage[] | null
-  docType: 'NFS-e' | 'PDF'
+  docType: MockDocType
   /** Value found by the regular extraction (built-in profile or heuristic), if any. */
   found: { item: TextItem; page: number; origin: Origin } | null
   /** Value printed on the page but not found by the regular extraction. */
@@ -576,7 +579,7 @@ function fill(doc: MockDoc, built: Built | null, kind: 'found' | 'hidden', origi
     : null
 }
 
-function add(dir: string, name: string, built: Built | null, kind: 'found' | 'hidden', docType: 'NFS-e' | 'PDF', origin: Origin, contentId?: string) {
+function add(dir: string, name: string, built: Built | null, kind: 'found' | 'hidden', docType: MockDocType, origin: Origin, contentId?: string) {
   const path = `${dir}/${name}`
   const doc: MockDoc = {
     path,
@@ -596,7 +599,7 @@ function add(dir: string, name: string, built: Built | null, kind: 'found' | 'hi
 }
 
 /** Like `add`, but the layout is only built on first use (keeps 3000 documents cheap). */
-function addLazy(dir: string, name: string, build: () => Built, kind: 'found' | 'hidden', docType: 'NFS-e' | 'PDF', origin: Origin) {
+function addLazy(dir: string, name: string, build: () => Built, kind: 'found' | 'hidden', docType: MockDocType, origin: Origin) {
   const doc = add(dir, name, null, kind, docType, origin)
   doc.pages = []
   doc.lazy = () => {
@@ -647,6 +650,8 @@ function addDuplicate(of: MockDoc, name: string) {
   add(A, 'nfse-2026-004-cliente-delta.pdf', danfse({ version: 2, number: '104', issued: '15/06/2026 10:32:00', competence: '06/2026', client: DELTA, cents: 837250, retained: 12750, pages: 2, seed: 14 }), 'found', 'NFS-e', BUILTIN)
   add(A, 'nfse-2026-005-cliente-alfa.pdf', danfse({ version: 2, number: '105', issued: '22/07/2026 11:20:54', competence: '07/2026', client: ALFA, cents: 1198000, seed: 15 }), 'found', 'NFS-e', BUILTIN)
   add(A, 'nfse-2026-006-cancelada.pdf', danfse({ version: 2, number: '106', issued: '23/07/2026 08:00:10', competence: '07/2026', client: BETA, cents: 500000, seed: 16 }), 'found', 'NFS-e', BUILTIN)
+  // A DANFSe with the SUBSTITUÍDA watermark: the engine types it, whatever the file name.
+  add(A, 'nfse-2026-007-cliente-beta.pdf', danfse({ version: 2, number: '107', issued: '24/07/2026 09:12:40', competence: '07/2026', client: BETA, cents: 480000, seed: 17 }), 'found', 'Substituída', BUILTIN)
   add(A, 'nota-danificada.pdf', null, 'found', 'PDF', AUTO)
   add(A, 'nota-municipal-0187.pdf', municipal({ number: '0187', issued: '03/07/2026 14:05:11', longDate: '3 de julho de 2026', client: FULANO, cents: 161235 }), 'found', 'PDF', AUTO)
   add(A, 'nota-municipal-0192.pdf', municipal({ number: '0192', issued: '17/06/2026 09:41:37', client: GAMA, cents: 207540 }), 'found', 'PDF', AUTO)

@@ -49,7 +49,8 @@ It runs on Windows, Linux and macOS and is built with Tauri 2, Rust, PDFium and 
     "Data de emissão".
 - A table with file, type, competence, value, status and origin: sort by any column, select ranges
   with Shift, and see the grand total, the selection total and totals by type. Duplicates and
-  invoices typed "Cancelada" are listed but left out of the total.
+  invoices typed "Cancelada" or "Substituída" are listed but left out of the total; a DANFSe with
+  the CANCELADA or SUBSTITUÍDA watermark gets that type by itself.
 - **Period** filter by competence (this month, this year, from MM/YYYY to MM/YYYY…), applied to
   the cards, the table, the totals and the export.
 - PDF preview with the value highlighted, so you can check where it came from.
