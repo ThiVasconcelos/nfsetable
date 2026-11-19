@@ -372,7 +372,12 @@
                   flow={report.cashFlow ?? []}
                   ondetails={() => selectTab('prolabore')}
                 />
-                <TaxSimplesCard simples={report.simples} activity={tax.activity} automatic={report.proLabore.automatic} />
+                <TaxSimplesCard
+                  simples={report.simples}
+                  activity={tax.activity}
+                  automatic={report.proLabore.automatic}
+                  month={report.referenceMonth}
+                />
               {/if}
               <!-- The limit of the current regime (the comparativo still shows the MEI to everyone). -->
               {#if mei}

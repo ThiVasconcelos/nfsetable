@@ -15,7 +15,7 @@ use super::window;
 use super::Input;
 use crate::model::{
     LeftoverReport, MeiReport, MeiStatus, ProLaboreReport, RegimeCost, RevenueSummary,
-    SimplesActivity, SimplesReport, TaxRate, TaxRegime, TaxReport,
+    SimplesActivity, SimplesReport, TaxRegime, TaxReport,
 };
 use crate::text::count_label;
 use rust_decimal::Decimal;
@@ -157,6 +157,8 @@ struct Estimate<'a> {
     fator_r: Decimal,
     /// DAS of the typical month in the annex given by the Fator R.
     das: Das,
+    /// Rates inside the DAS of the reference month itself, the ones its NFS-e states.
+    nfse_rates: Vec<(String, Decimal)>,
     /// MEI: the year to date against the limit, and where the year is heading.
     status: MeiStatus,
     outlook: MeiOutlook,
@@ -215,6 +217,17 @@ impl<'a> Estimate<'a> {
         let (fator_r, annex) =
             simples::fator_r_and_annex(input.activity, fs12, revenue.rbt12, simples_table);
         let das = simples::das(simples_table, annex, revenue.rbt12, revenue.average);
+        // The NFS-e of a month states the rates of that month's own DAS: the bracket of its RBT12
+        // window and the annex of its Fator R, as the PGDAS-D computes them (LC 123/2006, art. 23,
+        // § 2º), not the typical month's.
+        let reference_revenue = input
+            .revenue_history
+            .get(&input.reference)
+            .copied()
+            .unwrap_or_default();
+        let nfse_rates =
+            window::simples_month(input, data, input.reference, reference_revenue, pro_labore)
+                .rates;
 
         // MEI: year to date, and the year to date plus the average for each remaining month.
         let limit = mei::limit(tables, input.reference, input.opening);
@@ -248,6 +261,7 @@ impl<'a> Estimate<'a> {
             fs12,
             fator_r,
             das,
+            nfse_rates,
             status: mei::status(revenue.year_to_date, limit, tolerance),
             outlook: MeiOutlook {
                 limit,
@@ -331,14 +345,8 @@ impl<'a> Estimate<'a> {
                 effective_rate: to_f64(das.effective_rate),
                 das_cents: to_cents(das.total),
                 split: scenarios::tax_shares(&das.split),
-                rates: das
-                    .rates
-                    .iter()
-                    .map(|(tax, rate)| TaxRate {
-                        tax: tax.clone(),
-                        rate: to_f64(*rate),
-                    })
-                    .collect(),
+                rates: scenarios::tax_rates(&das.rates),
+                nfse_rates: scenarios::tax_rates(&self.nfse_rates),
                 pro_labore_for_annex_iii_cents: to_cents(ctx.auto_pro_labore),
                 me_limit_remaining_cents: to_cents(
                     (tables.simples.me_limit - ytd).max(Decimal::ZERO),
@@ -642,6 +650,7 @@ pub(crate) fn zero_report(input: &Input, warnings: Vec<String>) -> TaxReport {
             das_cents: 0,
             split: Vec::new(),
             rates: Vec::new(),
+            nfse_rates: Vec::new(),
             pro_labore_for_annex_iii_cents: 0,
             me_limit_remaining_cents: 0,
             me_limit_cents: 0,

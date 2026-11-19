@@ -490,11 +490,15 @@ export interface SimplesReport {
   dasCents: number
   /** DAS split by tax. */
   split: TaxShare[]
-  /**
-   * Effective rate of each tax inside the DAS: from 2027 the CBS and IBS ones go on the NFS-e and
-   * are what a buyer in the regular regime can credit.
-   */
+  /** Effective rate of each tax inside the DAS of the typical month. */
   rates: TaxRate[]
+  /**
+   * The same for the reference month as the PGDAS-D computes it (its own RBT12 window and Fator
+   * R; from 2027, the 1st bracket in the first months of activity): from 2027 its CBS and IBS
+   * rates go on that month's NFS-e and are what a buyer in the regular regime can credit (LC
+   * 123/2006, art. 23, § 2º).
+   */
+  nfseRates: TaxRate[]
   /**
    * Monthly pró-labore that brings the Fator R to 28% in the typical month and in every month
    * considered (the automatic amount), never below the minimum wage.

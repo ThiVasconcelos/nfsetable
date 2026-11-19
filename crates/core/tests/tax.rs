@@ -4,7 +4,7 @@
 
 use nfsetable_core::tax::tax_catalog;
 use nfsetable_core::{
-    tax_report, CoreError, MeiStatus, MonthAmount, RegimeCost, SimplesActivity, TaxInput,
+    tax_report, CoreError, MeiStatus, MonthAmount, RegimeCost, SimplesActivity, TaxInput, TaxRate,
     TaxRegime, TaxReport, TaxShare,
 };
 use serde_json::json;
@@ -699,6 +699,55 @@ fn iss_cap_in_annex_iii_bracket_5_in_2027() {
     assert_close(rates[4].1, 0.05);
     assert_close(rates[2].1, 0.02740384);
     assert_close(rates[5].1, 0.000307112);
+}
+
+#[test]
+fn nfse_rates_of_the_reference_month() {
+    // Revenue up from May 2027: 05/2026 to 04/2027 at 10.000,00, then 05 and 06/2027 at 50.000,00.
+    // The typical month takes the last 12 months considered: 10 × 10.000 + 2 × 50.000 = 200.000,00,
+    // bracket 2: (200.000 × 11,2% − 9.360) / 200.000 = 6,52%; CBS 6,52% × 16,91% = 1,102532%.
+    // June's own PGDAS-D takes 05/2026 to 04/2027 (the 12 months before the previous one):
+    // 120.000,00, bracket 1, 6%; its NFS-e states CBS 6% × 15,43% = 0,9258% and IBS 6% × 0,17% =
+    // 0,0102%, as the cash flow taxes June.
+    let mut data = input(
+        "2027-06",
+        [
+            months("2026-07", 10, 1_000_000),
+            months("2027-05", 2, 5_000_000),
+        ]
+        .concat(),
+    );
+    data.revenue_history = months("2026-04", 3, 1_000_000);
+    data.activity = SimplesActivity::AnnexIii;
+    let report = tax_report(&data).unwrap();
+    let simples = &report.simples;
+    let rate = |rates: &[TaxRate], tax: &str| rates.iter().find(|r| r.tax == tax).unwrap().rate;
+    assert_eq!(simples.bracket, 2);
+    assert_close(rate(&simples.rates, "cbs"), 0.01102532);
+    assert_close(rate(&simples.nfse_rates, "cbs"), 0.009258);
+    assert_close(rate(&simples.nfse_rates, "ibs"), 0.000102);
+    assert_eq!(
+        report.cash_flow.last().unwrap().company_taxes_cents,
+        300_000
+    );
+
+    // Opened in May 2027: June, its 2nd month, is at the 1st bracket of Anexo III (Fator R 0,28),
+    // so its NFS-e states the same 0,9258%, while the typical month (600.000,00 a year, Fator R
+    // 1.621 × 12 / 600.000 = 0,03) is in Anexo V.
+    let mut data = input("2027-06", months("2027-05", 2, 5_000_000));
+    data.opening_month = Some("2027-05".to_string());
+    data.pro_labore_cents = Some(162_100);
+    let report = tax_report(&data).unwrap();
+    assert_eq!(report.simples.annex, "V");
+    assert_close(rate(&report.simples.nfse_rates, "cbs"), 0.009258);
+
+    // Until 2026 the DAS has PIS and Cofins, and no CBS or IBS to state.
+    let report = tax_report(&input("2026-06", months("2025-07", 12, 1_000_000))).unwrap();
+    assert!(report
+        .simples
+        .nfse_rates
+        .iter()
+        .all(|r| r.tax != "cbs" && r.tax != "ibs"));
 }
 
 #[test]

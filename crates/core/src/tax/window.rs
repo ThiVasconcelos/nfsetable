@@ -33,6 +33,8 @@ pub(crate) struct SimplesMonth {
     pub annex: Annex,
     /// DAS, plus the ISS paid to the municipality when the bracket has none inside it.
     pub company: Decimal,
+    /// Effective rate of each tax inside the month's DAS (see `simples::Das::rates`).
+    pub rates: Vec<(String, Decimal)>,
     pub owner: ProLaboreTaxes,
     /// Smallest monthly pró-labore whose Fator R reaches the threshold in this month (rounded up to
     /// the cent, so the truncated Fator R does not fall short).
@@ -116,6 +118,7 @@ pub(crate) fn simples_month(
         fator_r,
         annex,
         company: das.total + iss,
+        rates: das.rates,
         owner: pro_labore_taxes(pro_labore, input.dependents, &tables),
         pro_labore_for_annex_iii: pro_labore_for_fator_r(
             rbt12 / Decimal::from(12),

@@ -490,6 +490,12 @@ export function mockTaxReport(input: TaxInput): TaxReport {
   const fatorR = fatorROf(fs12, rbt12)
   const annex = annexFor(input.activity, fatorR)
   const s = simples(annex, rbt12, average, refTables)
+  // The NFS-e of the reference month states the rates of that month's own DAS, as the PGDAS-D
+  // computes it (its RBT12 window and Fator R), not the typical month's.
+  const refRevenue = known.get(ref) ?? 0
+  const refRbt12 = rbt12Of(ref, refRevenue).rbt12
+  const refFatorR = openingRule(ref) ? 0.28 : fatorROf(fs12, refRbt12)
+  const nfseRates = simples(annexFor(input.activity, refFatorR), refRbt12, refRevenue, refTables).rates
 
   // MEI.
   const limit =
@@ -761,6 +767,7 @@ export function mockTaxReport(input: TaxInput): TaxReport {
       dasCents: s.das,
       split: s.split,
       rates: s.rates,
+      nfseRates,
       proLaboreForAnnexIiiCents: forAnnexIii,
       meLimitRemainingCents: Math.max(0, ME_LIMIT - yearToDate),
       meLimitCents: ME_LIMIT,

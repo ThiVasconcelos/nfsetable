@@ -11,7 +11,7 @@ use super::tables::{Distribution, Tables, TaxData};
 use super::window;
 use super::Input;
 use crate::model::{
-    CashFlowMonth, LeftoverReport, MeiStatus, PricingReport, RegimeCost, SimplesActivity,
+    CashFlowMonth, LeftoverReport, MeiStatus, PricingReport, RegimeCost, SimplesActivity, TaxRate,
     TaxRegime, TaxShare,
 };
 use rust_decimal::Decimal;
@@ -80,6 +80,16 @@ pub(crate) fn tax_shares(shares: &[(String, Decimal)]) -> Vec<TaxShare> {
         .map(|(tax, amount)| TaxShare {
             tax: tax.clone(),
             cents: to_cents(*amount),
+        })
+        .collect()
+}
+
+pub(crate) fn tax_rates(rates: &[(String, Decimal)]) -> Vec<TaxRate> {
+    rates
+        .iter()
+        .map(|(tax, rate)| TaxRate {
+            tax: tax.clone(),
+            rate: to_f64(*rate),
         })
         .collect()
 }

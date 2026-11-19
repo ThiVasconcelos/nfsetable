@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { formatBRL, formatPercent } from '../lib/format'
+  import { formatBRL, formatMonthShort, formatPercent } from '../lib/format'
   import { taxHint, taxName } from '../lib/labels'
   import type { SimplesActivity, SimplesReport } from '../lib/types'
   import Icon from './Icon.svelte'
@@ -11,15 +11,20 @@
     activity: SimplesActivity
     /** The pró-labore is automatic (then it already is the one for the Annex III). */
     automatic: boolean
+    /** Reference month (yyyy-mm): the NFS-e rates are its own. */
+    month: string
   }
 
-  let { simples: s, activity, automatic }: Props = $props()
+  let { simples: s, activity, automatic, month }: Props = $props()
 
   const tier = $derived(s.meLimitRemainingCents > 0 ? 'ME' : 'EPP')
   const annexIii = $derived(s.annex === 'III')
   const fatorMax = $derived(Math.min(1, Math.max(0.4, s.fatorR * 1.15)))
-  /** From 2027: the CBS and IBS rates inside the DAS, stated on the NFS-e (the buyer's credit). */
-  const noteRates = $derived(s.rates.filter((r) => r.tax === 'cbs' || r.tax === 'ibs'))
+  /**
+   * From 2027: the CBS and IBS rates inside the reference month's own DAS (its RBT12 window, not the
+   * typical month's), stated on its NFS-e (the buyer's credit).
+   */
+  const noteRates = $derived(s.nfseRates.filter((r) => r.tax === 'cbs' || r.tax === 'ibs'))
 </script>
 
 <TaxCard
@@ -97,8 +102,11 @@
         {/each}
       </ul>
       {#if noteRates.length}
-        <p class="note-rates" title="Alíquotas contidas no DAS: vão na NFS-e e são o crédito de um cliente do regime regular">
-          Na NFS-e:
+        <p
+          class="note-rates"
+          title="Alíquotas do DAS deste mês, pela faixa do RBT12 do próprio mês (como no PGDAS-D): vão na NFS-e e são o crédito de um cliente do regime regular"
+        >
+          Na NFS-e de {formatMonthShort(month, 'short')}:
           <!-- Svelte trims the ends of an element's text: the spaces around the dot stay outside. -->
           {#each noteRates as r, i (r.tax)}{#if i > 0}{' '}<span aria-hidden="true">·</span>{' '}{/if}<span class="part"
               >{taxName(r.tax)} <span class="num">{formatPercent(r.rate, 4)}</span></span
