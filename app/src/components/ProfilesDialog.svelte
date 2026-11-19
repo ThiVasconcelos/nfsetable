@@ -8,7 +8,7 @@
   import { formatInt, normalizeText, plural } from '../lib/format'
   import { describeRule } from '../lib/labels'
   import { classifies, compileNamePatterns, hasValueRules } from '../lib/rules'
-  import { KIND_LABEL, store, type RuleSeed } from '../lib/store.svelte'
+  import { isCancelledType, KIND_LABEL, store, type RuleSeed } from '../lib/store.svelte'
   import type { DocKind, Profile } from '../lib/types'
   import ChipsInput from './ChipsInput.svelte'
   import Icon from './Icon.svelte'
@@ -106,7 +106,7 @@
   })
   const typeSuggestions = $derived.by(() => {
     const q = normalizeText(docType)
-    const all = [...new Set([...EXPENSE_TYPES, ...store.knownTypes])].filter((t) => !['cancelada', 'substituida'].includes(normalizeText(t)))
+    const all = [...new Set([...EXPENSE_TYPES, ...store.knownTypes])].filter((t) => !isCancelledType(t))
     return all.filter((t) => normalizeText(t) !== q && (!q || normalizeText(t).includes(q))).slice(0, 8)
   })
 

@@ -1584,9 +1584,12 @@ export class AppStore {
 
   /** "Criar regra a partir desta nota": a name pattern from the file name, its type and kind. */
   ruleFromRow(row: Row) {
-    const generic = !row.docType || ['pdf', 'nfs-e'].includes(normalizeText(row.docType))
+    // A cancelled or substituted note is no model for a rule: such a rule would take every
+    // matching note out of the totals.
+    const generic =
+      !row.docType || isCancelledType(row.docType) || ['pdf', 'nfs-e'].includes(normalizeText(row.docType))
     this.openRules({
-      name: suggestRuleName(row.name, row.docType),
+      name: suggestRuleName(row.name, generic ? '' : row.docType),
       namePatterns: [suggestNamePattern(row.name)],
       fingerprint: [],
       docType: generic ? '' : row.docType,
