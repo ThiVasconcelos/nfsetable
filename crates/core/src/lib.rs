@@ -31,6 +31,7 @@ pub mod text;
 pub use engine::{dev_pdfium_dir, Engine, EXTRACTION_VERSION, PDFIUM_ENV_VAR, PDFIUM_PLATFORM};
 pub use error::CoreError;
 pub use export::{export_csv, export_table};
+pub use extract::is_watermark_type;
 pub use model::*;
 pub use profile::{
     builtin_fields, builtin_profiles, profiles_fingerprint, COMPETENCE_FIELD, NET_VALUE_FIELD,

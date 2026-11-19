@@ -4,8 +4,8 @@
 
 use nfsetable_core::parse::format_brl;
 use nfsetable_core::{
-    builtin_fields, builtin_profiles, dev_pdfium_dir, scan, DocResult, Engine, ScanOptions, Source,
-    Status, COMPETENCE_FIELD, NET_VALUE_FIELD,
+    builtin_fields, builtin_profiles, dev_pdfium_dir, is_watermark_type, scan, DocResult, Engine,
+    ScanOptions, Source, Status, COMPETENCE_FIELD, NET_VALUE_FIELD,
 };
 use std::path::Path;
 use std::process::ExitCode;
@@ -74,6 +74,21 @@ fn main() -> ExitCode {
             continue;
         }
         let doc = engine.extract(Path::new(&file.path), &profiles, &fields);
+        // A cancelled or substituted note (its watermark says so) is not revenue.
+        if is_watermark_type(&doc.doc_type) {
+            let value = doc
+                .fields
+                .get(NET_VALUE_FIELD)
+                .and_then(|value| value.cents)
+                .map_or_else(|| "-".to_string(), format_brl);
+            println!(
+                "{value:>16}  {:>7}  {}  ({}, não somada)",
+                competence(&doc),
+                file.name,
+                doc.doc_type
+            );
+            continue;
+        }
         match doc
             .fields
             .get(NET_VALUE_FIELD)

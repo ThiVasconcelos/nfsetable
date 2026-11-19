@@ -141,6 +141,11 @@ fn load(engine: &Engine, path: &Path, which: Pages) -> Result<LoadedDoc, CoreErr
 const WATERMARK_TYPES: [(&str, &str); 2] =
     [("cancelada", "Cancelada"), ("substituida", "Substituída")];
 
+/// A type the watermark of a cancelled or substituted DANFSe gives: such a note is not revenue.
+pub fn is_watermark_type(doc_type: &str) -> bool {
+    WATERMARK_TYPES.iter().any(|(_, known)| *known == doc_type)
+}
+
 /// The type a watermark gives the document: a slanted run that reads exactly CANCELADA or
 /// SUBSTITUÍDA, not slanted text that only mentions them (e.g. "substitui a nota cancelada").
 fn watermark_type<'a>(pages: impl IntoIterator<Item = &'a PageText>) -> Option<&'static str> {

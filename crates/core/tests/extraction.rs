@@ -132,6 +132,8 @@ fn watermarks_classify_the_danfse() {
     assert_eq!(extract("danfse-nt008.pdf").doc_type, "NFS-e");
     let cancelled = extract("danfse-nt008-watermark.pdf");
     assert_eq!(cancelled.doc_type, "Cancelada");
+    assert!(nfsetable_core::is_watermark_type(&cancelled.doc_type));
+    assert!(!nfsetable_core::is_watermark_type("NFS-e"));
     assert_eq!(cents(&cancelled), Some(127_400));
     let substituted = extract("danfse-nt008-watermark-sub.pdf");
     assert_eq!(substituted.doc_type, "Substituída");
