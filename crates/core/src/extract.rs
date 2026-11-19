@@ -28,7 +28,8 @@ const MAX_PAGES: u32 = 5;
 const AUTO_NET_VALUE_LABELS: &[(&str, Option<&str>)] = &[
     (r"valor\s*liquido\s*da\s*nfs-?e", Some(r"^\s*\+")),
     (r"valor\s*liquido\s*da\s*nota", None),
-    (r"valor\s*liquido", Some(r"^\s*\+")),
+    // Rejects "valor liquido + ..." and "valor liquido da nfs-e + ibs/cbs" (the 2027 total).
+    (r"valor\s*liquido", Some(r"^\s*(?:da\s*nfs-?e\s*)?\+")),
     (r"valor\s*total\s*da\s*nfs-?e", None),
     (r"valor\s*total\s*da\s*nota", None),
     (r"valor\s*total\s*dos\s*servicos", None),
@@ -829,6 +830,27 @@ mod tests {
             exclude_suffix: Some(r"^\s*\+".into()),
             direction,
             max_distance,
+        }
+    }
+
+    #[test]
+    fn the_net_value_heuristic_skips_the_total_with_ibs_cbs() {
+        let (pattern, exclude) = &auto_labels(NET_VALUE_FIELD).unwrap()[2];
+        assert_eq!(pattern.as_str(), r"valor\s*liquido");
+        let exclude = exclude.as_ref().unwrap();
+        // What follows "valor liquido" in the normalized line.
+        for kept in ["", ":", " a receber", " (r$)", " da nota", " do servico"] {
+            assert!(!exclude.is_match(kept), "{kept:?}");
+        }
+        for skipped in [
+            " + ibs/cbs",
+            "+ibs/cbs",
+            " da nfs-e + ibs/cbs",
+            " da nfse + ibs/cbs",
+            " da nfs-e +ibs/cbs",
+            "  da  nfs-e  +",
+        ] {
+            assert!(exclude.is_match(skipped), "{skipped:?}");
         }
     }
 
